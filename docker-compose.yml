@@ -1,0 +1,117 @@
+services:
+  gateway:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: gateway
+    environment:
+      - PORT=3000
+      - AUTH_URL=http://auth:4001
+      - CATALOG_URL=http://catalog:4002
+      - CART_URL=http://cart:4003
+      - ORDER_URL=http://order:4004
+      - PAYMENT_URL=http://payment:4005
+      - NOTIFICATION_URL=http://notification:4006
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth
+      - catalog
+      - cart
+      - order
+      - payment
+      - notification
+
+  auth:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: auth
+    environment:
+      - PORT=4001
+      - JWT_SECRET=super-secret
+    ports:
+      - "4001:4001"
+
+  catalog:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: catalog
+    environment:
+      - PORT=4002
+    ports:
+      - "4002:4002"
+
+  cart:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: cart
+    environment:
+      - PORT=4003
+    ports:
+      - "4003:4003"
+
+  order:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: order
+    environment:
+      - PORT=4004
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    ports:
+      - "4004:4004"
+    depends_on:
+      - rabbitmq
+
+  payment:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: payment
+    environment:
+      - PORT=4005
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    ports:
+      - "4005:4005"
+    depends_on:
+      - rabbitmq
+
+  notification:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: notification
+    environment:
+      - PORT=4006
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    ports:
+      - "4006:4006"
+    depends_on:
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus

@@ -1,0 +1,32 @@
+{
+  "name": "cloudcommercx",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Learning-first microservices e-commerce SDP project.",
+  "workspaces": [
+    "services/*",
+    "frontend-react"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start:all": "bash scripts/run-all-local.sh",
+    "build:frontend": "cd frontend-react && npm install && npm run build",
+    "start:gateway": "node services/gateway/src/index.js",
+    "start:auth": "node services/auth/src/index.js",
+    "start:catalog": "node services/catalog/src/index.js",
+    "start:cart": "node services/cart/src/index.js",
+    "start:order": "node services/order/src/index.js",
+    "start:payment": "node services/payment/src/index.js",
+    "start:notification": "node services/notification/src/index.js",
+    "migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.0",
+    "prom-client": "^15.1.3"
+  }
+}
