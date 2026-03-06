@@ -9,10 +9,11 @@ function getAuthHeader() {
 }
 
 export async function api(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...getAuthHeader(), ...options.headers }
+  const { skipLogoutOn401, ...fetchOptions } = options
+  const headers = { 'Content-Type': 'application/json', ...getAuthHeader(), ...fetchOptions.headers }
   const res = await fetch(path.startsWith('http') ? path : `${API}${path}`, {
     headers,
-    ...options,
+    ...fetchOptions,
   })
   const text = await res.text()
   let data
@@ -22,7 +23,7 @@ export async function api(path, options = {}) {
     throw new Error(res.ok ? 'Invalid response' : `Error ${res.status}`)
   }
   if (!res.ok) {
-    if (res.status === 401) {
+    if (res.status === 401 && !skipLogoutOn401) {
       try {
         localStorage.removeItem('cloudcommercx_user')
         window.dispatchEvent(new CustomEvent('auth:logout'))

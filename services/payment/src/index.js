@@ -1,3 +1,4 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../../../.env") });
 const express = require("express");
 const cors = require("cors");
 const { publish } = require("../../common/eventBus");
@@ -20,7 +21,7 @@ app.get("/metrics", async (_, res) => {
 app.get("/payments", (_, res) => res.json(payments));
 
 app.post("/payments", async (req, res) => {
-  const { orderId, amount } = req.body || {};
+  const { orderId, amount, userId } = req.body || {};
   if (!orderId || !amount) {
     return res.status(400).json({ error: "orderId and amount are required" });
   }
@@ -28,6 +29,7 @@ app.post("/payments", async (req, res) => {
     id: `pay${payments.length + 1}`,
     orderId,
     amount: Number(amount),
+    userId: userId || null,
     status: "SUCCESS",
     processedAt: new Date().toISOString(),
   };

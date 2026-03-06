@@ -91,7 +91,7 @@ All client requests go through the gateway. The gateway strips `/api/<service>` 
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/notifications` | List notifications (from events) |
+| GET | `/notifications` | List notifications. Query: `?userId=u1` to filter by user |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
 

@@ -1,20 +1,71 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 
-export default function NotificationsDropdown() {
+const getSeenKey = (userId) => `cloudcommercx_notif_seen_${userId || ''}`
+
+export default function NotificationsDropdown({ user }) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const [lastSeenCount, setLastSeenCount] = useState(() => {
+    try {
+      const key = getSeenKey(user?.id)
+      return parseInt(localStorage.getItem(key) || '0', 10)
+    } catch {
+      return 0
+    }
+  })
+
+  const fetchNotifications = (markAsSeen = false) => {
+    if (!user) return
+    const url = `/notification/notifications?userId=${encodeURIComponent(user.id)}`
+    api(url, { skipLogoutOn401: true })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setNotifications(list)
+        if (markAsSeen) {
+          setLastSeenCount(list.length)
+          try {
+            localStorage.setItem(getSeenKey(user.id), String(list.length))
+          } catch {}
+        }
+      })
+      .catch(() => setNotifications([]))
+  }
 
   useEffect(() => {
-    if (open) {
+    if (open && user) {
       setLoading(true)
-      api('/notification/notifications')
-        .then(setNotifications)
+      api(`/notification/notifications?userId=${encodeURIComponent(user.id)}`, { skipLogoutOn401: true })
+        .then((data) => {
+          const list = Array.isArray(data) ? data : []
+          setNotifications(list)
+          setLastSeenCount(list.length)
+          try {
+            localStorage.setItem(getSeenKey(user.id), String(list.length))
+          } catch {}
+        })
         .catch(() => setNotifications([]))
         .finally(() => setLoading(false))
     }
-  }, [open])
+  }, [open, user])
+
+  useEffect(() => {
+    if (!user) return
+    try {
+      setLastSeenCount(parseInt(localStorage.getItem(getSeenKey(user.id)) || '0', 10))
+    } catch {
+      setLastSeenCount(0)
+    }
+    const interval = setInterval(fetchNotifications, 30000)
+    const t = setTimeout(fetchNotifications, 150)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(t)
+    }
+  }, [user])
+
+  const unreadCount = Math.max(0, notifications.length - lastSeenCount)
 
   const formatDate = (d) => {
     if (!d) return ''
@@ -41,9 +92,9 @@ export default function NotificationsDropdown() {
         <svg className="w-6 h-6 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        {notifications.length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-medium rounded-full w-4 h-4 flex items-center justify-center">
-            {notifications.length}
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-xs font-medium rounded-full min-w-[1rem] h-4 px-1 flex items-center justify-center">
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>

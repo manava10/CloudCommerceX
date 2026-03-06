@@ -6,6 +6,7 @@ services:
         SERVICE_NAME: gateway
     environment:
       - PORT=3000
+      - JWT_SECRET=super-secret
       - AUTH_URL=http://auth:4001
       - CATALOG_URL=http://catalog:4002
       - CART_URL=http://cart:4003

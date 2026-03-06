@@ -1,3 +1,4 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../../../.env") });
 const express = require("express");
 const cors = require("cors");
 const { subscribe } = require("../../common/eventBus");
@@ -13,10 +14,12 @@ const port = process.env.PORT || 4006;
 const notifications = [];
 
 function addNotification(type, payload) {
+  const userId = payload?.userId || null;
   notifications.push({
     id: `n${notifications.length + 1}`,
     type,
     payload,
+    userId,
     createdAt: new Date().toISOString(),
   });
 }
@@ -26,11 +29,24 @@ app.get("/metrics", async (_, res) => {
   res.set("Content-Type", registry.contentType);
   res.send(await registry.metrics());
 });
-app.get("/notifications", (_, res) => res.json(notifications));
+app.get("/notifications", (req, res) => {
+  const userId = req.query.userId;
+  const list = userId
+    ? notifications.filter((n) => n.userId === userId)
+    : notifications;
+  res.json(list);
+});
 
 async function startConsumers() {
-  await subscribe("order.created", (payload) => addNotification("ORDER_CREATED", payload));
-  await subscribe("payment.completed", (payload) => addNotification("PAYMENT_COMPLETED", payload));
+  const ok1 = await subscribe("order.created", (payload) =>
+    addNotification("ORDER_CREATED", payload)
+  );
+  const ok2 = await subscribe("payment.completed", (payload) =>
+    addNotification("PAYMENT_COMPLETED", payload)
+  );
+  if (!ok1 || !ok2) {
+    throw new Error("RabbitMQ not available (RABBITMQ_URL not set or connection failed)");
+  }
 }
 
 if (require.main === module) {
@@ -40,7 +56,7 @@ if (require.main === module) {
       await startConsumers();
       console.log("notification consumers started");
     } catch (err) {
-      console.log("notification consumers unavailable, running without broker");
+      console.log("notification consumers unavailable, running without broker:", err.message);
     }
   });
 }

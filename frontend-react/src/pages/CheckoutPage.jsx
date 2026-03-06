@@ -59,7 +59,7 @@ export default function CheckoutPage({ user, cart, products, onCartCleared }) {
       })
       await api('/payment/payments', {
         method: 'POST',
-        body: JSON.stringify({ orderId: order.id, amount: order.total }),
+        body: JSON.stringify({ orderId: order.id, amount: order.total, userId: user.id }),
       })
       await api(`/order/orders/${order.id}/status`, {
         method: 'PATCH',

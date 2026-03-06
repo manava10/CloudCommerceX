@@ -12,7 +12,7 @@ export default function Header({ user, cartCount, onLogin, onSignup, onLogout, o
           {user ? (
             <>
               <span className="text-sm text-stone-600">{user.email}</span>
-              <NotificationsDropdown />
+              <NotificationsDropdown user={user} />
               <Link
                 to="/orders"
                 className="text-sm text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100"
