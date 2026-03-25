@@ -1,0 +1,53 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+
+    # Spin up an isolated PostgreSQL database just for this test run!
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: cloudcommercx_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js Environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        
+    - name: Install Dependencies
+      run: npm install
+      
+    - name: Provision Test Database Schema
+      run: npm run migrate
+      env:
+        DATABASE_URL: postgres://testuser:testpassword@localhost:5432/cloudcommercx_test?sslmode=disable
+        NODE_ENV: test
+
+    - name: Execute Test Suite
+      run: npm test
+      env:
+        DATABASE_URL: postgres://testuser:testpassword@localhost:5432/cloudcommercx_test?sslmode=disable
+        NODE_ENV: test

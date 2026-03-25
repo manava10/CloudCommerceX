@@ -1,0 +1,160 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "CloudCommercX API",
+    "version": "1.0.0",
+    "description": "API documentation for the CloudCommercX microservices platform."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Gateway Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "test@demo.com" },
+                  "password": { "type": "string", "example": "pass123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and get a JWT token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "test@demo.com" },
+                  "password": { "type": "string", "example": "pass123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK (Returns JWT token)" }
+        }
+      }
+    },
+    "/api/catalog/products": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List all products",
+        "security": [],
+        "responses": {
+          "200": { "description": "Array of products" }
+        }
+      }
+    },
+    "/api/cart/cart/{userId}": {
+      "get": {
+        "tags": ["Cart"],
+        "summary": "Get the user's cart",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Cart items" }
+        }
+      }
+    },
+    "/api/cart/cart/{userId}/items": {
+      "post": {
+        "tags": ["Cart"],
+        "summary": "Add an item to the cart",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productId": { "type": "string", "example": "p1" },
+                  "qty": { "type": "integer", "example": 1 },
+                  "price": { "type": "number", "example": 6999 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Added to cart" }
+        }
+      }
+    },
+    "/api/order/orders": {
+      "get": {
+        "tags": ["Order"],
+        "summary": "List orders for a user",
+        "parameters": [
+          { "name": "userId", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Orders list" }
+        }
+      },
+      "post": {
+        "tags": ["Order"],
+        "summary": "Create a new order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": { "type": "string", "example": "1" },
+                  "items": { "type": "array", "items": { "type": "object" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Order created" }
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,8 @@ const path = require("path");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const client = require("prom-client");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./swagger.json");
 
 const app = express();
 const jwtSecret = process.env.JWT_SECRET || "dev-secret";
@@ -71,6 +73,9 @@ app.get("/metrics", async (_, res) => {
   res.set("Content-Type", registry.contentType);
   res.send(await registry.metrics());
 });
+
+// Swagger UI Endpoint
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use("/api/auth", (req, res) => forward(req, res, serviceUrls.auth, "/api/auth"));
 app.use("/api/catalog", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));

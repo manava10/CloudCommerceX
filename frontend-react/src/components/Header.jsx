@@ -3,12 +3,13 @@ import NotificationsDropdown from './NotificationsDropdown'
 
 export default function Header({ user, cartCount, onLogin, onSignup, onLogout, onCartClick }) {
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-stone-200">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <Link to="/" className="text-xl font-bold text-stone-900 tracking-tight">
+        <Link to="/" className="text-xl font-bold text-stone-900 tracking-tight flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-stone-900 items-center justify-center text-white text-xs hidden sm:flex">CX</div>
           CloudCommercX
         </Link>
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-6">
           {user ? (
             <>
               <span className="text-sm text-stone-600">{user.email}</span>
