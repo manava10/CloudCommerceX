@@ -59,6 +59,23 @@ app.post("/cart/:userId/items", async (req, res) => {
   if (!productId || !qty || !price) {
     return res.status(400).json({ error: "productId, qty, price are required" });
   }
+  
+  // Synchronous Inter-Service Communication (Stock Verification)
+  try {
+    const catalogUrl = process.env.CATALOG_URL || "http://localhost:4002";
+    const catalogRes = await fetch(`${catalogUrl}/products/${productId}`);
+    if (!catalogRes.ok) {
+      return res.status(400).json({ error: "invalid product or catalog unavailable" });
+    }
+    const productData = await catalogRes.json();
+    if (productData.stock < qty) {
+      return res.status(400).json({ error: `Insufficient stock! Only ${productData.stock} left for ${productData.name}.` });
+    }
+  } catch (err) {
+    console.warn("Could not reach catalog service for stock validation:", err.message);
+    return res.status(502).json({ error: "Unable to verify stock inventory at this time." });
+  }
+
   if (useDb && db) {
     try {
       await db.query(
