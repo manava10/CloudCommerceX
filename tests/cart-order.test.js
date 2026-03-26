@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const { app: cartApp } = require("../services/cart/src/index");
 const { app: orderApp } = require("../services/order/src/index");
+const { app: catalogApp } = require("../services/catalog/src/index");
 
 function startServer(app) {
   return new Promise((resolve) => {
@@ -14,6 +15,9 @@ function startServer(app) {
 }
 
 test("cart and order flow works", async () => {
+  const catalog = await startServer(catalogApp);
+  process.env.CATALOG_URL = catalog.baseUrl; // Inject dynamically so the cart service can find it for stock validation
+
   const cart = await startServer(cartApp);
   const order = await startServer(orderApp);
 
@@ -21,7 +25,7 @@ test("cart and order flow works", async () => {
     const addItemResponse = await fetch(`${cart.baseUrl}/cart/u1/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId: "p1", qty: 2, price: 3499 }),
+      body: JSON.stringify({ productId: "p1", qty: 2, price: 6999 }),
     });
     assert.equal(addItemResponse.status, 201);
     const cartData = await addItemResponse.json();
@@ -36,9 +40,10 @@ test("cart and order flow works", async () => {
     assert.equal(orderResponse.status, 201);
     const orderData = await orderResponse.json();
     assert.equal(orderData.status, "CREATED");
-    assert.equal(orderData.total, 6998);
+    assert.equal(orderData.total, 13998);
   } finally {
     cart.server.close();
     order.server.close();
+    catalog.server.close();
   }
 });
