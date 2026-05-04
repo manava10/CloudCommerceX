@@ -1,0 +1,156 @@
+Chapter 4: Methodology & Technologies
+
+4.1 Algorithms Used
+
+4.1.1 Password Hashing
+Purpose:
+  Protect user credentials by storing a one-way hash instead of plain text.
+Method:
+  - SHA-256 hash via crypto.createHash("sha256").
+  - The same input password yields a deterministic hash for comparison.
+Application Points:
+  - Registration: hash is generated and persisted.
+  - Login: provided password is hashed and compared to stored hash.
+Output:
+  - Fixed-length hexadecimal digest used as the stored password value.
+
+4.1.2 JWT Token Creation
+Purpose:
+  Issue a short-lived access token that represents an authenticated user.
+Method:
+  - jwt.sign({ sub: userId, email }, JWT_SECRET, { expiresIn: "1h" }).
+Claims:
+  - sub: canonical user identifier.
+  - email: user email for downstream context.
+Security Controls:
+  - HMAC signature with JWT_SECRET.
+  - 1-hour expiration to limit exposure.
+Usage:
+  - Auth service issues token at login/registration.
+  - Gateway verifies token for protected routes.
+
+4.1.3 Cart Upsert
+Purpose:
+  Add items to a cart while merging duplicates without race conditions.
+Method:
+  - PostgreSQL INSERT ... ON CONFLICT DO UPDATE SET qty = qty + EXCLUDED.qty.
+Behavior:
+  - New cart item creates a row.
+  - Existing cart item increments quantity atomically.
+Result:
+  - Single-row cart representation per user and product.
+
+4.1.4 Order Total Calculation
+Purpose:
+  Compute the payable amount at checkout.
+Method:
+  - total = sum(price × qty) across items.
+Process:
+  - Iterate through cart items.
+  - Multiply item price by requested quantity.
+  - Aggregate into a single total value.
+Output:
+  - Numeric total used by order/payment workflows.
+
+4.1.5 Stock Validation (Cart)
+Purpose:
+  Prevent checkout with quantities exceeding available inventory.
+Method:
+  - Cart service fetches catalog product data.
+  - Validate stock >= requested qty before confirming cart updates.
+Outcome:
+  - Sufficient stock allows add/update.
+  - Insufficient stock blocks the operation.
+
+4.1.6 Event-Driven Messaging
+Purpose:
+  Decouple services and enable asynchronous workflows.
+Method:
+  - RabbitMQ topic exchange cloudcommercx.events for publish/subscribe.
+Flow:
+  - Order and payment services publish events.
+  - Notification service subscribes to relevant routing keys.
+Result:
+  - Reliable propagation of domain events without tight coupling.
+
+4.1.7 Notification Filtering
+Purpose:
+  Return only relevant notifications to a specific user.
+Method:
+  - Notifications optionally filtered by userId query param.
+Behavior:
+  - If userId is provided, results are scoped to that user.
+  - If omitted, service can return all notifications.
+
+4.2 Technologies, Frameworks & Tools
+
+4.2.1 Backend
+Runtime:
+  - Node.js 20 for modern JavaScript features and performance.
+Framework:
+  - Express 5 for HTTP routing and middleware composition.
+Security:
+  - JSON Web Token (jsonwebtoken) for authentication tokens.
+Data:
+  - PostgreSQL (pg) for relational persistence and transactional updates.
+Messaging & Observability:
+  - RabbitMQ for async event delivery.
+  - Prometheus client library for service metrics.
+
+4.2.2 Frontend
+Framework:
+  - React 19 for component-driven UI development.
+Routing:
+  - React Router 7 for SPA navigation.
+Build Tooling:
+  - Vite 7 for fast dev server and optimized production builds.
+Styling:
+  - TailwindCSS for utility-first responsive UI design.
+Data Access:
+  - Fetch API for HTTP requests to the API gateway.
+
+4.2.3 Infrastructure & DevOps
+Containerization:
+  - Docker & Docker Compose for repeatable local and multi-service setups.
+Messaging:
+  - RabbitMQ broker container for event-driven workflows.
+Monitoring:
+  - Prometheus for scraping /metrics endpoints.
+  - Grafana for dashboards and visualization.
+
+4.2.4 Testing & Utility
+Testing:
+  - Node test runner for integration and service-level tests.
+Utilities:
+  - Fetch API for client-side and test HTTP calls.
+
+4.3 Data Flow / Processing Logic
+
+4.3.1 Client-to-Service Routing
+1) The frontend issues requests to /api/* endpoints.
+2) The gateway receives the request as a single entry point.
+3) The gateway strips the service prefix and forwards internally.
+4) Responses are returned through the gateway to the client.
+
+4.3.2 Authentication Flow
+1) User registers or logs in through the auth service.
+2) Auth service validates credentials and issues a JWT.
+3) The gateway validates the JWT on protected routes.
+4) Downstream services rely on the gateway’s verification.
+
+4.3.3 Cart and Order Flow
+1) Cart service validates stock by querying the catalog service.
+2) Cart updates use upsert logic to merge quantities.
+3) Order service calculates the total from cart items.
+4) Payment service processes the order total and emits an event.
+
+4.3.4 Event & Notification Flow
+1) Order and payment services publish domain events.
+2) RabbitMQ topic exchange routes events to subscribers.
+3) Notification service consumes events and records notifications.
+4) Client requests notifications, optionally filtered by userId.
+
+4.3.5 Observability Flow
+1) Each service exposes operational metrics at /metrics.
+2) Prometheus scrapes metrics at configured intervals.
+3) Grafana dashboards visualize system health and throughput.
