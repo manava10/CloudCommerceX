@@ -60,10 +60,10 @@ See `docs/architecture.md` for diagram.
 | Service | Responsibilities | Data Store |
 |---------|-------------------|-----------|
 | Gateway | Routes `/api/*`, serves frontend | — |
-| Auth | Users, JWT | PostgreSQL (optional) |
+| Auth | Users, JWT | PostgreSQL (optional, in-memory fallback) |
 | Catalog | Product list | In-memory |
-| Cart | User cart state | PostgreSQL (optional) |
-| Order | Orders + order items | PostgreSQL (optional) |
+| Cart | User cart state | PostgreSQL (optional, in-memory fallback) |
+| Order | Orders + order items | PostgreSQL (optional, in-memory fallback) |
 | Payment | Mock payments | In-memory |
 | Notification | Event-based alerts | In-memory |
 
@@ -77,7 +77,7 @@ See `docs/architecture.md` for diagram.
 ### Auth (`services/auth`)
 - `POST /register`, `POST /login`
 - Issues JWT on login
-- User data stored in PostgreSQL when `DATABASE_URL` is set
+- User data stored in PostgreSQL when `DATABASE_URL` is set, otherwise in-memory
 
 ### Catalog (`services/catalog`)
 - `GET /products`, `GET /products/:id`
