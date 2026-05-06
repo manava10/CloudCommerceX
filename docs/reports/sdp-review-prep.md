@@ -134,9 +134,7 @@ Full API tables: `docs/api-contracts.md`
 ```bash
 docker compose up --build
 ```
-- App: http://localhost:3000
-- Grafana: http://localhost:3001
-- RabbitMQ: http://localhost:15672
+Service URLs: see **Quick Ports** below.
 
 ### Option B — Local (no Docker)
 ```bash
@@ -149,9 +147,16 @@ Detailed steps: `docs/DEPLOYMENT-GUIDE.md`
 
 ---
 
-## 8. Demo Script (repeatable walkthrough)
+## 8. Quick Ports (single source of truth)
+- Gateway / App: http://localhost:3000
+- Grafana: http://localhost:3001
+- RabbitMQ Management: http://localhost:15672
+
+---
+
+## 9. Demo Script (repeatable walkthrough)
 1. Start Docker Compose.
-2. Open app at http://localhost:3000
+2. Open app at the Gateway URL (see Quick Ports).
 3. Register a new user and log in.
 4. Browse products and add to cart.
 5. Checkout → create order → mock payment.
@@ -160,7 +165,7 @@ Detailed steps: `docs/DEPLOYMENT-GUIDE.md`
 
 ---
 
-## 9. Testing Evidence
+## 10. Testing Evidence
 Run:
 ```bash
 npm test
@@ -171,14 +176,14 @@ Tests:
 
 ---
 
-## 10. Monitoring & Metrics
+## 11. Monitoring & Metrics
 - Every service exposes `/metrics` (Prometheus scrape target).
 - Grafana provisioned dashboards in `monitoring/grafana`.
 - Prometheus config in `monitoring/prometheus/prometheus.yml`.
 
 ---
 
-## 11. Risks, Constraints, and Mitigations
+## 12. Risks, Constraints, and Mitigations
 | Risk / Constraint | Impact | Mitigation |
 |-------------------|--------|------------|
 | In-memory data for some services | Data loss on restart | Optional PostgreSQL integration |
@@ -187,7 +192,7 @@ Tests:
 
 ---
 
-## 12. Review Q&A Cheat Sheet
+## 13. Review Q&A Cheat Sheet
 **Q: Why microservices here?**  
 A: To demonstrate service boundaries, independent deployment, and event‑driven integration suitable for SDP learning goals.
 
@@ -205,7 +210,7 @@ A: Persistent storage, Kubernetes rollout, CI/CD, tracing.
 
 ---
 
-## 13. Handy Links (for reviewers)
+## 14. Handy Links (for reviewers)
 - `docs/architecture.md`
 - `docs/api-contracts.md`
 - `docs/DEPLOYMENT-GUIDE.md`
