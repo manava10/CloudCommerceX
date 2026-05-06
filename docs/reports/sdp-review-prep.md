@@ -27,7 +27,7 @@
 - Show synchronous and asynchronous inter‑service communication.
 - Deploy the whole stack with Docker Compose.
 - Add monitoring and metrics endpoints.
-- Produce review‑wise deliverables and reports.
+- Produce review-ready deliverables and reports.
 
 ### In Scope (implemented)
 - User registration/login with JWT
@@ -61,11 +61,11 @@ See `docs/architecture.md` for diagram.
 |---------|-------------------|-----------|
 | Gateway | Routes `/api/*`, serves frontend | — |
 | Auth | Users, JWT | PostgreSQL (optional) |
-| Catalog | Product list | In‑memory |
+| Catalog | Product list | In-memory |
 | Cart | User cart state | PostgreSQL (optional) |
 | Order | Orders + order items | PostgreSQL (optional) |
-| Payment | Mock payments | In‑memory |
-| Notification | Event-based alerts | In‑memory |
+| Payment | Mock payments | In-memory |
+| Notification | Event-based alerts | In-memory |
 
 ---
 
