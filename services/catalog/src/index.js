@@ -307,9 +307,44 @@ app.get("/seller/:sellerId/stats", async (req, res) => {
   return res.json({ productCount: 0, totalStock: 0, orderCount: 0, revenue: 0 });
 });
 
+// ── Event Listeners ──
+const { subscribe } = require("../../common/eventBus");
+
+async function startEventListeners() {
+  try {
+    await subscribe("payment.completed", async (payload) => {
+      if (!useDb || !db || !payload.orderId) return;
+      
+      const orderId = String(payload.orderId).replace(/^o/, "");
+      
+      try {
+        // Fetch order items to know what to decrement
+        const orderItemsRes = await db.query(
+          "SELECT product_id, qty FROM order_items WHERE order_id = $1", 
+          [orderId]
+        );
+        
+        for (const item of orderItemsRes.rows) {
+          const numericId = String(item.product_id).replace(/^p/, "");
+          await db.query(
+            "UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
+            [item.qty, numericId]
+          );
+        }
+      } catch (err) {
+        console.error("Failed to decrement stock for order:", err);
+      }
+    });
+    console.log("catalog service: payment listener started (stock decrement)");
+  } catch (e) {
+    console.log("catalog service: event listener unavailable (no broker)");
+  }
+}
+
 if (require.main === module) {
-  app.listen(port, () => {
+  app.listen(port, async () => {
     console.log(`catalog service listening on ${port} (db: ${useDb && db ? "yes" : "no"})`);
+    await startEventListeners();
   });
 }
 

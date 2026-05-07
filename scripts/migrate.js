@@ -84,6 +84,18 @@ async function migrate() {
     )
   `);
 
+  // ── Notifications table ──
+  await query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(50) NOT NULL,
+      type VARCHAR(50) NOT NULL,
+      payload JSONB,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   console.log("Migration complete. Products must be created by registered sellers.");
 }
 

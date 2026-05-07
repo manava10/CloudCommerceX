@@ -4,6 +4,7 @@ import { api } from './lib/api'
 import { ToastProvider, useToast } from './context/ToastContext'
 import Header from './components/Header'
 import HomePage from './pages/HomePage'
+import ProductDetailPage from './pages/ProductDetailPage'
 import OrdersPage from './pages/OrdersPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
@@ -151,7 +152,7 @@ function RoutesWrapper({
   const showHeader = !isSellerDashboard
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       {showHeader && (
         <Header
           user={user}
@@ -163,46 +164,49 @@ function RoutesWrapper({
         />
       )}
 
-      <Routes>
-        {/* ── Buyer routes ── */}
-        <Route path="/" element={<HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
-        <Route path="/orders" element={<ProtectedRoute user={user}><OrdersPage user={user} products={products} /></ProtectedRoute>} />
-        <Route path="/checkout" element={<ProtectedRoute user={user}><CheckoutPage user={user} cart={cart} products={products} onCartCleared={refreshCart} /></ProtectedRoute>} />
-        <Route path="/order-confirmation/:orderId" element={<ProtectedRoute user={user}><OrderConfirmationPage user={user} products={products} /></ProtectedRoute>} />
+      <div className="flex-1">
+        <Routes>
+          {/* ── Buyer routes ── */}
+          <Route path="/" element={<HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
+          <Route path="/product/:id" element={<ProductDetailPage products={products} productsLoading={productsLoading} onAddToCart={addToCart} cart={cart} user={user} />} />
+          <Route path="/orders" element={<ProtectedRoute user={user}><OrdersPage user={user} products={products} /></ProtectedRoute>} />
+          <Route path="/checkout" element={<ProtectedRoute user={user}><CheckoutPage user={user} cart={cart} products={products} onCartCleared={refreshCart} /></ProtectedRoute>} />
+          <Route path="/order-confirmation/:orderId" element={<ProtectedRoute user={user}><OrderConfirmationPage user={user} products={products} /></ProtectedRoute>} />
 
-        {/* ── Seller registration (shows header, same as homepage) ── */}
-        <Route path="/seller/register" element={<SellerRegisterPage onSuccess={onAuthSuccess} />} />
+          {/* ── Seller registration (shows header, same as homepage) ── */}
+          <Route path="/seller/register" element={<SellerRegisterPage onSuccess={onAuthSuccess} />} />
 
-        {/* ── Seller dashboard routes ── */}
-        <Route path="/seller" element={
-          <ProtectedRoute user={user}>
-            <SellerLayout user={user}>
-              <SellerDashboardPage user={user} />
-            </SellerLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/seller/products" element={
-          <ProtectedRoute user={user}>
-            <SellerLayout user={user}>
-              <SellerProductsPage user={user} />
-            </SellerLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/seller/add-product" element={
-          <ProtectedRoute user={user}>
-            <SellerLayout user={user}>
-              <SellerAddProductPage user={user} />
-            </SellerLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/seller/orders" element={
-          <ProtectedRoute user={user}>
-            <SellerLayout user={user}>
-              <SellerOrdersPage user={user} />
-            </SellerLayout>
-          </ProtectedRoute>
-        } />
-      </Routes>
+          {/* ── Seller dashboard routes ── */}
+          <Route path="/seller" element={
+            <ProtectedRoute user={user}>
+              <SellerLayout user={user}>
+                <SellerDashboardPage user={user} />
+              </SellerLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/seller/products" element={
+            <ProtectedRoute user={user}>
+              <SellerLayout user={user}>
+                <SellerProductsPage user={user} />
+              </SellerLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/seller/add-product" element={
+            <ProtectedRoute user={user}>
+              <SellerLayout user={user}>
+                <SellerAddProductPage user={user} />
+              </SellerLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/seller/orders" element={
+            <ProtectedRoute user={user}>
+              <SellerLayout user={user}>
+                <SellerOrdersPage user={user} />
+              </SellerLayout>
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </div>
 
       <AuthModal
         open={showAuth}

@@ -11,37 +11,88 @@ const registry = new client.Registry();
 client.collectDefaultMetrics({ register: registry });
 
 const port = process.env.PORT || 4006;
-const notifications = [];
+const useDb = !!process.env.DATABASE_URL;
 
-function addNotification(type, payload) {
+let db;
+if (useDb) {
+  try {
+    db = require("../../common/db");
+  } catch (e) {
+    console.warn("DB module load failed, using in-memory:", e.message);
+  }
+}
+
+const fallbackNotifications = [];
+
+async function addNotification(type, payload) {
   const userId = payload?.userId || null;
-  notifications.push({
-    id: `n${notifications.length + 1}`,
-    type,
-    payload,
-    userId,
-    createdAt: new Date().toISOString(),
-  });
+  const createdAt = new Date().toISOString();
+  
+  if (useDb && db) {
+    try {
+      if (userId) {
+        await db.query(
+          "INSERT INTO notifications (user_id, type, payload, created_at) VALUES ($1, $2, $3, $4)",
+          [userId, type, JSON.stringify(payload), createdAt]
+        );
+      }
+      
+      // Also create a notification for each seller involved in the order
+      if (type === "ORDER_CREATED" && payload?.items) {
+        const sellerIds = [...new Set(payload.items.map((i) => i.sellerId).filter(Boolean))];
+        for (const sellerId of sellerIds) {
+          const sellerItems = payload.items.filter((i) => i.sellerId === sellerId);
+          const sellerTotal = sellerItems.reduce((s, i) => s + i.price * i.qty, 0);
+          
+          await db.query(
+            "INSERT INTO notifications (user_id, type, payload, created_at) VALUES ($1, $2, $3, $4)",
+            [
+              sellerId, 
+              "SELLER_NEW_ORDER", 
+              JSON.stringify({
+                orderId: payload.id,
+                buyerId: payload.userId,
+                sellerId,
+                items: sellerItems,
+                total: sellerTotal,
+              }), 
+              createdAt
+            ]
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to save notification to DB:", err);
+    }
+  } else {
+    // In-memory fallback
+    fallbackNotifications.push({
+      id: `n${fallbackNotifications.length + 1}`,
+      type,
+      payload,
+      userId,
+      createdAt,
+    });
 
-  // Also create a notification for each seller involved in the order
-  if (type === "ORDER_CREATED" && payload?.items) {
-    const sellerIds = [...new Set(payload.items.map((i) => i.sellerId).filter(Boolean))];
-    for (const sellerId of sellerIds) {
-      const sellerItems = payload.items.filter((i) => i.sellerId === sellerId);
-      const sellerTotal = sellerItems.reduce((s, i) => s + i.price * i.qty, 0);
-      notifications.push({
-        id: `n${notifications.length + 1}`,
-        type: "SELLER_NEW_ORDER",
-        payload: {
-          orderId: payload.id,
-          buyerId: payload.userId,
-          sellerId,
-          items: sellerItems,
-          total: sellerTotal,
-        },
-        userId: sellerId,
-        createdAt: new Date().toISOString(),
-      });
+    if (type === "ORDER_CREATED" && payload?.items) {
+      const sellerIds = [...new Set(payload.items.map((i) => i.sellerId).filter(Boolean))];
+      for (const sellerId of sellerIds) {
+        const sellerItems = payload.items.filter((i) => i.sellerId === sellerId);
+        const sellerTotal = sellerItems.reduce((s, i) => s + i.price * i.qty, 0);
+        fallbackNotifications.push({
+          id: `n${fallbackNotifications.length + 1}`,
+          type: "SELLER_NEW_ORDER",
+          payload: {
+            orderId: payload.id,
+            buyerId: payload.userId,
+            sellerId,
+            items: sellerItems,
+            total: sellerTotal,
+          },
+          userId: sellerId,
+          createdAt,
+        });
+      }
     }
   }
 }
@@ -51,12 +102,35 @@ app.get("/metrics", async (_, res) => {
   res.set("Content-Type", registry.contentType);
   res.send(await registry.metrics());
 });
-app.get("/notifications", (req, res) => {
+
+app.get("/notifications", async (req, res) => {
   const userId = req.query.userId;
+  
+  if (useDb && db) {
+    try {
+      let r;
+      if (userId) {
+        r = await db.query(
+          "SELECT id, user_id as \"userId\", type, payload, is_read as \"isRead\", created_at as \"createdAt\" FROM notifications WHERE user_id = $1 ORDER BY created_at DESC",
+          [userId]
+        );
+      } else {
+        r = await db.query(
+          "SELECT id, user_id as \"userId\", type, payload, is_read as \"isRead\", created_at as \"createdAt\" FROM notifications ORDER BY created_at DESC"
+        );
+      }
+      return res.json(r.rows);
+    } catch (err) {
+      console.error("Failed to fetch notifications from DB:", err);
+      return res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  }
+  
   const list = userId
-    ? notifications.filter((n) => n.userId === userId)
-    : notifications;
-  res.json(list);
+    ? fallbackNotifications.filter((n) => n.userId === userId)
+    : fallbackNotifications;
+  // Sort descending by date to match DB behavior
+  res.json(list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
 });
 
 async function startConsumers() {
@@ -76,7 +150,7 @@ async function startConsumers() {
 
 if (require.main === module) {
   app.listen(port, async () => {
-    console.log(`notification service listening on ${port}`);
+    console.log(`notification service listening on ${port} (db: ${useDb && db ? "yes" : "no"})`);
     try {
       await startConsumers();
       console.log("notification consumers started");
@@ -86,4 +160,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, notifications, addNotification };
+module.exports = { app, addNotification };
