@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { subscribe } = require("../../common/eventBus");
 const client = require("prom-client");
+const { sendOrderStatusEmail } = require("./email");
 
 const app = express();
 app.use(cors());
@@ -59,6 +60,34 @@ async function addNotification(type, payload) {
               createdAt
             ]
           );
+        }
+      }
+
+      // Send email for order status updates
+      if (type === "ORDER_STATUS_UPDATED" && payload?.orderId && payload?.status) {
+        const numericOrderId = String(payload.orderId).replace(/^o/, "");
+        try {
+          const r = await db.query(
+            "SELECT u.email FROM orders o JOIN users u ON o.user_id = u.id WHERE o.id = $1",
+            [numericOrderId]
+          );
+          if (r.rows.length > 0) {
+            sendOrderStatusEmail(r.rows[0].email, payload.orderId, payload.status).catch(e => console.error("Email dispatch failed:", e));
+          }
+        } catch (err) {
+          console.error("Failed to query user email for order status update:", err);
+        }
+      }
+
+      // Send email for order creation
+      if (type === "ORDER_CREATED" && payload?.id && payload?.userId) {
+        try {
+          const r = await db.query("SELECT email FROM users WHERE id = $1", [payload.userId.replace(/^u/, "")]);
+          if (r.rows.length > 0) {
+            sendOrderStatusEmail(r.rows[0].email, payload.id, "CREATED").catch(e => console.error("Email dispatch failed:", e));
+          }
+        } catch (err) {
+          console.error("Failed to query user email for order creation:", err);
         }
       }
     } catch (err) {

@@ -22,6 +22,9 @@ async function migrate() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'buyer';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS store_name VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS store_description TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS otp VARCHAR(10);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ;
     END $$;
   `);
 
@@ -49,8 +52,16 @@ async function migrate() {
       user_id VARCHAR(50) NOT NULL,
       total INTEGER NOT NULL,
       status VARCHAR(50) DEFAULT 'CREATED',
+      shipping_address JSONB,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `);
+
+  // Add shipping_address to orders if missing
+  await query(`
+    DO $$ BEGIN
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_address JSONB;
+    END $$;
   `);
 
   // ── Order items table ──

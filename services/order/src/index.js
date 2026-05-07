@@ -42,7 +42,7 @@ app.get("/orders", async (req, res) => {
         // Seller view: orders that contain at least one item from this seller
         const numericSellerId = String(sellerId).replace(/^u/, "");
         r = await db.query(
-          `SELECT DISTINCT o.id, o.user_id as "userId", o.total, o.status, o.created_at as "createdAt"
+          `SELECT DISTINCT o.id, o.user_id as "userId", o.total, o.status, o.shipping_address as "shippingAddress", o.created_at as "createdAt"
            FROM orders o
            INNER JOIN order_items oi ON oi.order_id = o.id
            WHERE oi.seller_id = $1
@@ -51,13 +51,13 @@ app.get("/orders", async (req, res) => {
         );
       } else if (userId) {
         r = await db.query(
-          `SELECT o.id, o.user_id as "userId", o.total, o.status, o.created_at as "createdAt"
+          `SELECT o.id, o.user_id as "userId", o.total, o.status, o.shipping_address as "shippingAddress", o.created_at as "createdAt"
            FROM orders o WHERE o.user_id = $1 ORDER BY o.created_at DESC`,
           [userId]
         );
       } else {
         r = await db.query(
-          `SELECT o.id, o.user_id as "userId", o.total, o.status, o.created_at as "createdAt"
+          `SELECT o.id, o.user_id as "userId", o.total, o.status, o.shipping_address as "shippingAddress", o.created_at as "createdAt"
            FROM orders o ORDER BY o.created_at DESC`
         );
       }
@@ -77,6 +77,7 @@ app.get("/orders", async (req, res) => {
             })),
             total: row.total,
             status: row.status,
+            shippingAddress: row.shippingAddress,
             createdAt: row.createdAt,
           };
         })
@@ -94,7 +95,7 @@ app.get("/orders", async (req, res) => {
 
 // ── Create order ──
 app.post("/orders", async (req, res) => {
-  const { userId, items } = req.body || {};
+  const { userId, items, shippingAddress } = req.body || {};
   if (!userId || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "userId and items are required" });
   }
@@ -121,8 +122,8 @@ app.post("/orders", async (req, res) => {
       );
 
       const r = await db.query(
-        "INSERT INTO orders (user_id, total, status) VALUES ($1, $2, $3) RETURNING id",
-        [userId, total, "CREATED"]
+        "INSERT INTO orders (user_id, total, status, shipping_address) VALUES ($1, $2, $3, $4) RETURNING id",
+        [userId, total, "CREATED", shippingAddress ? JSON.stringify(shippingAddress) : null]
       );
       const orderId = r.rows[0].id;
       for (const item of enrichedItems) {
@@ -142,6 +143,7 @@ app.post("/orders", async (req, res) => {
         })),
         total,
         status: "CREATED",
+        shippingAddress,
         createdAt: new Date().toISOString(),
       };
       await publish("order.created", order);

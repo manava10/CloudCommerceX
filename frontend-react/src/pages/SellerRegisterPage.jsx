@@ -11,6 +11,8 @@ export default function SellerRegisterPage({ onSuccess }) {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showOTP, setShowOTP] = useState(false)
+  const [otp, setOtp] = useState('')
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
@@ -18,14 +20,36 @@ export default function SellerRegisterPage({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.email || !form.password || !form.storeName) {
-      setError('Email, password, and store name are required')
-      return
-    }
     setError('')
     setLoading(true)
+    
+    if (showOTP) {
+      try {
+        const data = await api('/auth/verify-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: form.email, otp }),
+        })
+        const userData = { ...data.user, token: data.token }
+        localStorage.setItem('cloudcommercx_user', JSON.stringify(userData))
+        toast('Seller account verified! Welcome to your dashboard.', 'success')
+        if (onSuccess) onSuccess(userData)
+        navigate('/seller')
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (!form.email || !form.password || !form.storeName) {
+      setError('Email, password, and store name are required')
+      setLoading(false)
+      return
+    }
+    
     try {
-      await api('/auth/register', {
+      const data = await api('/auth/register', {
         method: 'POST',
         body: JSON.stringify({
           email: form.email,
@@ -37,20 +61,28 @@ export default function SellerRegisterPage({ onSuccess }) {
         skipLogoutOn401: true,
       })
 
-      const loginData = await api('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: form.email, password: form.password }),
-        skipLogoutOn401: true,
-      })
-
-      const userData = { ...loginData.user, token: loginData.token }
-      localStorage.setItem('cloudcommercx_user', JSON.stringify(userData))
-
-      toast('Seller account created! Welcome to your dashboard.', 'success')
-      if (onSuccess) onSuccess(userData)
-      navigate('/seller')
+      if (data.requireVerification) {
+        setShowOTP(true)
+        toast('Verification code sent to your email!', 'success')
+      } else {
+        const loginData = await api('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email: form.email, password: form.password }),
+          skipLogoutOn401: true,
+        })
+        const userData = { ...loginData.user, token: loginData.token }
+        localStorage.setItem('cloudcommercx_user', JSON.stringify(userData))
+        toast('Seller account created! Welcome to your dashboard.', 'success')
+        if (onSuccess) onSuccess(userData)
+        navigate('/seller')
+      }
     } catch (err) {
-      setError(err.message)
+      if (err.message === 'account not verified') {
+        setShowOTP(true)
+        setError('Account not verified. Please enter the OTP sent to your email.')
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -97,69 +129,90 @@ export default function SellerRegisterPage({ onSuccess }) {
 
         {/* Right — Form */}
         <div className="bg-white rounded-2xl border border-stone-200 p-8">
-          <h2 className="text-2xl font-semibold text-stone-900">Create Seller Account</h2>
-          <p className="mt-2 text-stone-600">Fill in your store details to get started.</p>
+          <h2 className="text-2xl font-semibold text-stone-900">
+            {showOTP ? 'Verify Email' : 'Create Seller Account'}
+          </h2>
+          <p className="mt-2 text-stone-600">
+            {showOTP ? `We sent a 6-digit code to ${form.email}` : 'Fill in your store details to get started.'}
+          </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Store Name *</label>
-              <input
-                name="storeName"
-                value={form.storeName}
-                onChange={handleChange}
-                placeholder="My Awesome Store"
-                required
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
-              />
-            </div>
+            {!showOTP ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Store Name *</label>
+                  <input
+                    name="storeName"
+                    value={form.storeName}
+                    onChange={handleChange}
+                    placeholder="My Awesome Store"
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Store Description</label>
-              <textarea
-                name="storeDescription"
-                value={form.storeDescription}
-                onChange={handleChange}
-                placeholder="Tell buyers about your store..."
-                rows={3}
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none resize-none"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Store Description</label>
+                  <textarea
+                    name="storeDescription"
+                    value={form.storeDescription}
+                    onChange={handleChange}
+                    placeholder="Tell buyers about your store..."
+                    rows={3}
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none resize-none"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Email *</label>
-              <input
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="seller@example.com"
-                required
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Email *</label>
+                  <input
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="seller@example.com"
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Password *</label>
-              <input
-                name="password"
-                type="password"
-                value={form.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                minLength={6}
-                required
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-1">Password *</label>
+                  <input
+                    name="password"
+                    type="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    minLength={6}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
+                  />
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">6-Digit Code</label>
+                <input
+                  type="text"
+                  maxLength="6"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none text-center text-xl tracking-widest"
+                  placeholder="000000"
+                />
+              </div>
+            )}
 
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (showOTP && otp.length !== 6)}
               className="w-full py-3 rounded-xl bg-stone-900 text-white font-medium hover:bg-stone-800 disabled:opacity-50 transition"
             >
-              {loading ? 'Creating Account...' : 'Create Seller Account'}
+              {loading ? 'Please wait...' : showOTP ? 'Verify & Go to Dashboard' : 'Create Seller Account'}
             </button>
           </form>
 

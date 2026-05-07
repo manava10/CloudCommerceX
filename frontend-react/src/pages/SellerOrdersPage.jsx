@@ -137,6 +137,19 @@ export default function SellerOrdersPage({ user }) {
                 ))}
               </div>
 
+              {order.shippingAddress && (
+                <div className="px-6 pb-4">
+                  <div className="bg-stone-50 rounded-xl p-4 border border-stone-100">
+                    <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">Shipping Address</h4>
+                    <p className="text-sm font-medium text-stone-900">{order.shippingAddress.name}</p>
+                    <p className="text-sm text-stone-600 mt-1">{order.shippingAddress.line1}</p>
+                    {order.shippingAddress.line2 && <p className="text-sm text-stone-600">{order.shippingAddress.line2}</p>}
+                    <p className="text-sm text-stone-600">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}</p>
+                    <p className="text-sm text-stone-600 mt-1 font-mono">📞 {order.shippingAddress.phone}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-t border-stone-100">
                 <div className="text-stone-700">
                   Total: <span className="font-semibold text-stone-900">₹{(order.total / 100).toLocaleString('en-IN')}</span>

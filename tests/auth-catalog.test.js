@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 // Force in-memory mode for tests
 delete process.env.DATABASE_URL;
 
-const { app: authApp } = require("../services/auth/src/index");
+const { app: authApp, users: memoryUsers } = require("../services/auth/src/index");
 const { app: catalogApp } = require("../services/catalog/src/index");
 
 function startServer(app) {
@@ -29,6 +29,19 @@ test("auth register/login and catalog listing works", async () => {
       body: JSON.stringify({ email: testEmail, password: "secret123" }),
     });
     assert.equal(registerResponse.status, 201);
+    
+    const db = require("../services/common/db");
+    const r = await db.query("SELECT otp FROM users WHERE email = $1", [testEmail]);
+    const otp = r.rows[0].otp;
+
+    const verifyResponse = await fetch(`${auth.baseUrl}/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: testEmail, otp }),
+    });
+    assert.equal(verifyResponse.status, 200);
+    const verifyData = await verifyResponse.json();
+    assert.ok(verifyData.token);
 
     const loginResponse = await fetch(`${auth.baseUrl}/login`, {
       method: "POST",

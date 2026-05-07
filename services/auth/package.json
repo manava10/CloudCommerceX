@@ -2,5 +2,8 @@
   "name": "@cloudcommercx/auth",
   "version": "1.0.0",
   "main": "src/index.js",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "nodemailer": "^8.0.7"
+  }
 }
