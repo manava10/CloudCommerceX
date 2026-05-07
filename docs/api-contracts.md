@@ -20,6 +20,7 @@ All client requests go through the gateway. The gateway strips `/api/<service>` 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/register` | Create user. Body: `{ email, password }` |
+| POST | `/register-seller` | Create seller account. Body: `{ email, password, storeName }`. Returns `{ token, user: { id, email, role, sellerId, storeName } }` |
 | POST | `/login` | Login. Body: `{ email, password }`. Returns `{ token, user }` |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
@@ -33,11 +34,14 @@ All client requests go through the gateway. The gateway strips `/api/<service>` 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/products` | List all products |
+| GET | `/products?sellerId=s1` | List products for one seller |
 | GET | `/products/:id` | Get product by id |
+| POST | `/products` | Seller creates product. Body: `{ name, price, stock, image, description }` |
+| GET | `/sellers/:sellerId/products` | List products owned by a seller |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
 
-**Data:** In-memory (hardcoded products)
+**Data:** PostgreSQL `products` table when `DATABASE_URL` is set; otherwise in-memory fallback.
 
 ---
 
@@ -61,7 +65,10 @@ All client requests go through the gateway. The gateway strips `/api/<service>` 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/orders` | List orders. Query: `?userId=u1` to filter by user |
+| GET | `/sellers/:sellerId/orders` | Seller view of incoming orders and payment status |
+| PATCH | `/sellers/:sellerId/orders/:orderId/items/:productId/tracking` | Seller updates fulfillment status, courier, tracking ID, and estimated delivery date |
 | POST | `/orders` | Create order. Body: `{ userId, items: [{ productId, qty, price }] }` |
+| PATCH | `/orders/:id/cancel` | Customer cancels their own order before delivery |
 | PATCH | `/orders/:id/status` | Update status. Body: `{ status }` (e.g. PAID) |
 | GET | `/health` | Health check |
 | GET | `/metrics` | Prometheus metrics |
@@ -105,13 +112,20 @@ All client requests go through the gateway. The gateway strips `/api/<service>` 
 
 ```
 /api/auth/register      POST
+/api/auth/register-seller  POST
 /api/auth/login         POST
 /api/catalog/products   GET
+/api/catalog/products?sellerId=s1  GET
+/api/catalog/products   POST (seller only)
+/api/catalog/sellers/:sellerId/products  GET
 /api/catalog/products/:id  GET
 /api/cart/cart/:userId  GET, DELETE
 /api/cart/cart/:userId/items  POST
 /api/cart/cart/:userId/items/:productId  DELETE
 /api/order/orders       GET (?userId=), POST
+/api/order/sellers/:sellerId/orders  GET
+/api/order/sellers/:sellerId/orders/:orderId/items/:productId/tracking  PATCH
+/api/order/orders/:id/cancel  PATCH
 /api/order/orders/:id/status  PATCH
 /api/payment/payments   GET, POST
 /api/notification/notifications  GET

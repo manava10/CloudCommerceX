@@ -1,24 +1,51 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useToast } from '../context/ToastContext'
+
+const trackingSteps = ['PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED']
 
 export default function OrderConfirmationPage({ user, products }) {
+  const toast = useToast()
   const { orderId } = useParams()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [cancelling, setCancelling] = useState(false)
 
-  useEffect(() => {
+  const loadOrder = async () => {
     if (!orderId || !user) return
-    api(`/order/orders?userId=${encodeURIComponent(user.id)}`)
+    setLoading(true)
+    return api(`/order/orders?userId=${encodeURIComponent(user.id)}`)
       .then((orders) => {
         const o = orders.find((x) => x.id === orderId)
         setOrder(o || null)
       })
       .catch(() => setOrder(null))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadOrder()
   }, [orderId, user])
 
   const getProduct = (id) => products.find((p) => p.id === id)
+
+  const cancelOrder = async () => {
+    if (!order) return
+    setCancelling(true)
+    try {
+      const updated = await api(`/order/orders/${order.id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ userId: user.id }),
+      })
+      setOrder(updated)
+      toast('Order cancelled.', 'success')
+    } catch (e) {
+      toast(e.message, 'error')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -56,9 +83,12 @@ export default function OrderConfirmationPage({ user, products }) {
           </div>
           <ul className="space-y-3 mb-6">
             {order.items?.map((item) => (
-              <li key={item.productId} className="flex justify-between">
-                <span>{getProduct(item.productId)?.name || item.productId} × {item.qty || 1}</span>
-                <span>₹{((item.price || 0) * (item.qty || 1)).toLocaleString()}</span>
+              <li key={item.productId} className="rounded-xl bg-stone-50 p-4">
+                <div className="flex justify-between gap-4">
+                  <span>{getProduct(item.productId)?.name || item.productId} × {item.qty || 1}</span>
+                  <span>₹{((item.price || 0) * (item.qty || 1)).toLocaleString()}</span>
+                </div>
+                <TrackingSummary item={item} />
               </li>
             ))}
           </ul>
@@ -75,6 +105,15 @@ export default function OrderConfirmationPage({ user, products }) {
         >
           View all orders
         </Link>
+        {canCancelOrder(order) && (
+          <button
+            onClick={cancelOrder}
+            disabled={cancelling}
+            className="px-6 py-3 rounded-xl border border-red-200 text-red-700 font-medium hover:bg-red-50 disabled:opacity-50"
+          >
+            {cancelling ? 'Cancelling...' : 'Cancel order'}
+          </button>
+        )}
         <Link
           to="/"
           className="px-6 py-3 rounded-xl bg-stone-900 text-white font-medium hover:bg-stone-800"
@@ -84,4 +123,71 @@ export default function OrderConfirmationPage({ user, products }) {
       </div>
     </div>
   )
+}
+
+function TrackingSummary({ item }) {
+  const status = item.fulfillmentStatus || 'PROCESSING'
+  const activeIndex = Math.max(0, trackingSteps.indexOf(status))
+  const cancelled = status === 'CANCELLED'
+
+  return (
+    <div className="mt-4 border-t border-stone-200 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-medium text-stone-900">
+          Tracking: {formatFulfillment(status)}
+        </p>
+        {item.estimatedDeliveryDate && !cancelled && (
+          <p className="text-sm text-stone-600">Expected by {formatDateOnly(item.estimatedDeliveryDate)}</p>
+        )}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {trackingSteps.map((step, index) => (
+          <div
+            key={step}
+            className={`rounded-lg px-3 py-2 text-center text-xs font-medium ${
+              !cancelled && index <= activeIndex
+                ? 'bg-green-100 text-green-800'
+                : 'bg-white text-stone-500'
+            }`}
+          >
+            {formatFulfillment(step)}
+          </div>
+        ))}
+      </div>
+      {(item.courier || item.trackingId) && (
+        <p className="mt-3 text-sm text-stone-600">
+          {item.courier && <>Courier: <span className="font-medium text-stone-800">{item.courier}</span></>}
+          {item.courier && item.trackingId && <span className="mx-2 text-stone-300">|</span>}
+          {item.trackingId && <>Tracking ID: <span className="font-medium text-stone-800">{item.trackingId}</span></>}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function canCancelOrder(order) {
+  if (!order || order.status === 'CANCELLED') return false
+  return order.items?.every((item) => {
+    const status = item.fulfillmentStatus || 'PROCESSING'
+    return status !== 'DELIVERED' && status !== 'CANCELLED'
+  })
+}
+
+function formatFulfillment(status) {
+  const labels = {
+    PROCESSING: 'Processing',
+    SHIPPED: 'Shipped',
+    OUT_FOR_DELIVERY: 'Out for delivery',
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled',
+  }
+  return labels[status] || status
+}
+
+function formatDateOnly(d) {
+  return new Date(d).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }

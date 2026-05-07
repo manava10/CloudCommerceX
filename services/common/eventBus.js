@@ -14,6 +14,7 @@ async function getChannel() {
   const conn = await amqp.connect(rabbitUrl);
   channel = await conn.createChannel();
   await channel.assertExchange(exchange, "topic", { durable: false });
+  console.log("✅ Successfully connected to RabbitMQ (CloudAMQP)!");
   return channel;
 }
 

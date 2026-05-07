@@ -4,9 +4,9 @@ services:
       context: .
       args:
         SERVICE_NAME: gateway
+    env_file: .env
     environment:
       - PORT=3000
-      - JWT_SECRET=super-secret
       - AUTH_URL=http://auth:4001
       - CATALOG_URL=http://catalog:4002
       - CART_URL=http://cart:4003
@@ -28,9 +28,9 @@ services:
       context: .
       args:
         SERVICE_NAME: auth
+    env_file: .env
     environment:
       - PORT=4001
-      - JWT_SECRET=super-secret
     ports:
       - "4001:4001"
 
@@ -39,6 +39,7 @@ services:
       context: .
       args:
         SERVICE_NAME: catalog
+    env_file: .env
     environment:
       - PORT=4002
     ports:
@@ -49,8 +50,10 @@ services:
       context: .
       args:
         SERVICE_NAME: cart
+    env_file: .env
     environment:
       - PORT=4003
+      - CATALOG_URL=http://catalog:4002
     ports:
       - "4003:4003"
 
@@ -59,45 +62,34 @@ services:
       context: .
       args:
         SERVICE_NAME: order
+    env_file: .env
     environment:
       - PORT=4004
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - CATALOG_URL=http://catalog:4002
     ports:
       - "4004:4004"
-    depends_on:
-      - rabbitmq
 
   payment:
     build:
       context: .
       args:
         SERVICE_NAME: payment
+    env_file: .env
     environment:
       - PORT=4005
-      - RABBITMQ_URL=amqp://rabbitmq:5672
     ports:
       - "4005:4005"
-    depends_on:
-      - rabbitmq
 
   notification:
     build:
       context: .
       args:
         SERVICE_NAME: notification
+    env_file: .env
     environment:
       - PORT=4006
-      - RABBITMQ_URL=amqp://rabbitmq:5672
     ports:
       - "4006:4006"
-    depends_on:
-      - rabbitmq
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
 
   prometheus:
     image: prom/prometheus:latest

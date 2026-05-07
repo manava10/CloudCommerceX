@@ -32,7 +32,11 @@ function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: "unauthorized" });
   try {
     const decoded = jwt.verify(token, jwtSecret);
-    req.user = { id: decoded.sub };
+    req.user = {
+      id: decoded.sub,
+      role: decoded.role || "customer",
+      sellerId: decoded.sellerId || null,
+    };
     next();
   } catch {
     return res.status(401).json({ error: "invalid or expired token" });
@@ -44,6 +48,9 @@ async function forward(req, res, targetBase, stripPrefix) {
   const url = `${targetBase}${suffix}`;
   const headers = { "Content-Type": "application/json" };
   if (req.headers.authorization) headers["Authorization"] = req.headers.authorization;
+  if (req.user?.id) headers["X-User-Id"] = req.user.id;
+  if (req.user?.role) headers["X-User-Role"] = req.user.role;
+  if (req.user?.sellerId) headers["X-Seller-Id"] = req.user.sellerId;
   const body =
     req.method === "GET" || req.method === "DELETE" ? undefined : JSON.stringify(req.body || {});
 
@@ -78,7 +85,10 @@ app.get("/metrics", async (_, res) => {
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use("/api/auth", (req, res) => forward(req, res, serviceUrls.auth, "/api/auth"));
-app.use("/api/catalog", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+app.use("/api/catalog", (req, res, next) => {
+  if (req.method === "GET") return next();
+  return requireAuth(req, res, next);
+}, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
 app.use("/api/cart", requireAuth, (req, res) => forward(req, res, serviceUrls.cart, "/api/cart"));
 app.use("/api/order", requireAuth, (req, res) => forward(req, res, serviceUrls.order, "/api/order"));
 app.use("/api/payment", requireAuth, (req, res) => forward(req, res, serviceUrls.payment, "/api/payment"));

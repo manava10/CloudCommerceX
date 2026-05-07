@@ -41,7 +41,9 @@ app.get("/cart/:userId", async (req, res) => {
   if (useDb && db) {
     try {
       const r = await db.query(
-        "SELECT product_id as \"productId\", qty, price FROM cart_items WHERE user_id = $1",
+        `SELECT product_id as "productId", seller_id as "sellerId", qty, price
+         FROM cart_items
+         WHERE user_id = $1`,
         [userId]
       );
       return res.json({ userId, items: r.rows });
@@ -71,6 +73,7 @@ app.post("/cart/:userId/items", async (req, res) => {
     if (productData.stock < qty) {
       return res.status(400).json({ error: `Insufficient stock! Only ${productData.stock} left for ${productData.name}.` });
     }
+    req.productData = productData;
   } catch (err) {
     console.warn("Could not reach catalog service for stock validation:", err.message);
     return res.status(502).json({ error: "Unable to verify stock inventory at this time." });
@@ -79,14 +82,19 @@ app.post("/cart/:userId/items", async (req, res) => {
   if (useDb && db) {
     try {
       await db.query(
-        `INSERT INTO cart_items (user_id, product_id, qty, price)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO cart_items (user_id, product_id, seller_id, qty, price)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (user_id, product_id)
-         DO UPDATE SET qty = cart_items.qty + EXCLUDED.qty`,
-        [userId, productId, Number(qty), Number(price)]
+         DO UPDATE SET
+          seller_id = EXCLUDED.seller_id,
+          qty = cart_items.qty + EXCLUDED.qty,
+          price = EXCLUDED.price`,
+        [userId, productId, req.productData?.sellerId || null, Number(qty), Number(price)]
       );
       const r = await db.query(
-        "SELECT product_id as \"productId\", qty, price FROM cart_items WHERE user_id = $1",
+        `SELECT product_id as "productId", seller_id as "sellerId", qty, price
+         FROM cart_items
+         WHERE user_id = $1`,
         [userId]
       );
       return res.status(201).json({ userId, items: r.rows });
@@ -99,8 +107,14 @@ app.post("/cart/:userId/items", async (req, res) => {
   const existing = cart.items.find((item) => item.productId === productId);
   if (existing) {
     existing.qty += Number(qty);
+    existing.sellerId = req.productData?.sellerId || existing.sellerId || null;
   } else {
-    cart.items.push({ productId, qty: Number(qty), price: Number(price) });
+    cart.items.push({
+      productId,
+      sellerId: req.productData?.sellerId || null,
+      qty: Number(qty),
+      price: Number(price),
+    });
   }
   return res.status(201).json(cart);
 });
@@ -115,7 +129,9 @@ app.delete("/cart/:userId/items/:productId", async (req, res) => {
         productId,
       ]);
       const r = await db.query(
-        "SELECT product_id as \"productId\", qty, price FROM cart_items WHERE user_id = $1",
+        `SELECT product_id as "productId", seller_id as "sellerId", qty, price
+         FROM cart_items
+         WHERE user_id = $1`,
         [userId]
       );
       return res.json({ userId, items: r.rows });

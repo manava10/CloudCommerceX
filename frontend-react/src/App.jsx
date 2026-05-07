@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { api } from './lib/api'
 import { ToastProvider, useToast } from './context/ToastContext'
 import Header from './components/Header'
@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage'
 import OrdersPage from './pages/OrdersPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
+import SellerDashboardPage from './pages/SellerDashboardPage'
 import AuthModal from './components/AuthModal'
 import CartDrawer from './components/CartDrawer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -106,12 +107,14 @@ function AppContent() {
           cartCount={cart.reduce((s, i) => s + (i.qty || 1), 0)}
           onLogin={() => { setAuthMode('login'); setShowAuth(true) }}
           onSignup={() => { setAuthMode('signup'); setShowAuth(true) }}
+          onSellerSignup={() => { setAuthMode('seller'); setShowAuth(true) }}
           onLogout={() => setUser(null)}
           onCartClick={() => setShowCart(true)}
         />
         <Routes>
-          <Route path="/" element={<HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
+          <Route path="/" element={user?.role === 'seller' ? <Navigate to="/seller" replace /> : <HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
           <Route path="/orders" element={<ProtectedRoute user={user}><OrdersPage user={user} products={products} /></ProtectedRoute>} />
+          <Route path="/seller" element={<ProtectedRoute user={user}><SellerDashboardPage user={user} /></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute user={user}><CheckoutPage user={user} cart={cart} products={products} onCartCleared={refreshCart} /></ProtectedRoute>} />
           <Route path="/order-confirmation/:orderId" element={<ProtectedRoute user={user}><OrderConfirmationPage user={user} products={products} /></ProtectedRoute>} />
         </Routes>
@@ -120,7 +123,7 @@ function AppContent() {
           mode={authMode}
           onClose={() => setShowAuth(false)}
           onSuccess={onAuthSuccess}
-          onSwitchMode={() => setAuthMode((m) => (m === 'login' ? 'signup' : 'login'))}
+          onSwitchMode={(nextMode) => setAuthMode((m) => nextMode || (m === 'login' ? 'signup' : 'login'))}
         />
         <CartDrawer
           open={showCart}

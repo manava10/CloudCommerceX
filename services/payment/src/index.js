@@ -21,10 +21,19 @@ app.get("/metrics", async (_, res) => {
 app.get("/payments", (_, res) => res.json(payments));
 
 app.post("/payments", async (req, res) => {
-  const { orderId, amount, userId } = req.body || {};
+  const { orderId, amount, userId, cardNumber } = req.body || {};
   if (!orderId || !amount) {
     return res.status(400).json({ error: "orderId and amount are required" });
   }
+
+  // Artificial 2-second delay to simulate bank processing
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Simulate Card Declined for cards starting with 4000
+  if (cardNumber && cardNumber.startsWith("4000")) {
+    return res.status(402).json({ error: "Card Declined by Bank" });
+  }
+
   const payment = {
     id: `pay${payments.length + 1}`,
     orderId,

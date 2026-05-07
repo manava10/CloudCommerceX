@@ -38,13 +38,10 @@ app.get("/notifications", (req, res) => {
 });
 
 async function startConsumers() {
-  const ok1 = await subscribe("order.created", (payload) =>
-    addNotification("ORDER_CREATED", payload)
-  );
-  const ok2 = await subscribe("payment.completed", (payload) =>
+  const ok = await subscribe("payment.completed", (payload) =>
     addNotification("PAYMENT_COMPLETED", payload)
   );
-  if (!ok1 || !ok2) {
+  if (!ok) {
     throw new Error("RabbitMQ not available (RABBITMQ_URL not set or connection failed)");
   }
 }

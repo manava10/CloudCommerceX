@@ -59,7 +59,7 @@ export default function CheckoutPage({ user, cart, products, onCartCleared }) {
       })
       await api('/payment/payments', {
         method: 'POST',
-        body: JSON.stringify({ orderId: order.id, amount: order.total, userId: user.id }),
+        body: JSON.stringify({ orderId: order.id, amount: order.total, userId: user.id, cardNumber: payment.cardNumber }),
       })
       await api(`/order/orders/${order.id}/status`, {
         method: 'PATCH',
@@ -160,8 +160,17 @@ export default function CheckoutPage({ user, cart, products, onCartCleared }) {
 
       {step === 2 && (
         <div className="bg-white rounded-2xl border border-stone-200 p-6 mb-6">
-          <h2 className="font-semibold text-stone-900 mb-4">Payment Details (Mock)</h2>
-          <p className="text-sm text-stone-500 mb-4">This is a demo. Use any 16-digit number, MM/YY, and 3-digit CVV.</p>
+          <h2 className="font-semibold text-stone-900 mb-4">Payment Details</h2>
+          
+          <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm mb-6 border border-blue-100">
+            <p className="font-semibold mb-2">🧪 Test Cards for Demo</p>
+            <ul className="space-y-1">
+              <li><span className="font-mono bg-blue-100 px-1 rounded">4242 4242 4242 4242</span> - Simulates a <strong>Successful</strong> Payment</li>
+              <li><span className="font-mono bg-blue-100 px-1 rounded">4000 0000 0000 0000</span> - Simulates a <strong>Declined</strong> Card</li>
+            </ul>
+            <p className="mt-2 text-xs opacity-80">Use any future MM/YY and any 3-digit CVV.</p>
+          </div>
+
           <div className="space-y-4">
             <input
               placeholder="Card number (16 digits)"
@@ -197,7 +206,7 @@ export default function CheckoutPage({ user, cart, products, onCartCleared }) {
               disabled={loading}
               className="flex-1 py-3 rounded-xl bg-stone-900 text-white font-medium hover:bg-stone-800 disabled:opacity-50"
             >
-              {loading ? 'Placing order...' : `Pay ₹${total.toLocaleString()}`}
+              {loading ? 'Processing Payment... 🔄' : `Pay ₹${total.toLocaleString()}`}
             </button>
           </div>
         </div>
