@@ -19,6 +19,7 @@ function startServer(app) {
 test("auth register/login and catalog listing works", async () => {
   const auth = await startServer(authApp);
   const catalog = await startServer(catalogApp);
+  const useDb = !!process.env.DATABASE_URL;
 
   const testEmail = `demo-${Date.now()}@cloudcommercx.dev`;
 
@@ -29,10 +30,16 @@ test("auth register/login and catalog listing works", async () => {
       body: JSON.stringify({ email: testEmail, password: "secret123" }),
     });
     assert.equal(registerResponse.status, 201);
-    
-    const db = require("../services/common/db");
-    const r = await db.query("SELECT otp FROM users WHERE email = $1", [testEmail]);
-    const otp = r.rows[0].otp;
+
+    let otp;
+    if (useDb) {
+      const db = require("../services/common/db");
+      const r = await db.query("SELECT otp FROM users WHERE email = $1", [testEmail]);
+      otp = r.rows[0].otp;
+    } else {
+      otp = memoryUsers.find((user) => user.email === testEmail)?.otp;
+    }
+    assert.ok(otp);
 
     const verifyResponse = await fetch(`${auth.baseUrl}/verify-otp`, {
       method: "POST",
@@ -59,7 +66,7 @@ test("auth register/login and catalog listing works", async () => {
   } finally {
     auth.server.close();
     catalog.server.close();
-    if (!!process.env.DATABASE_URL) {
+    if (useDb) {
       try { await require("../services/common/db").end(); } catch (e) {}
     }
     setTimeout(() => process.exit(0), 50); // Force exit hanging AMQP connections
