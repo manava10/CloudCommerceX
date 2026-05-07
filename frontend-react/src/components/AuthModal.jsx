@@ -27,7 +27,7 @@ export default function AuthModal({ open, mode, onClose, onSuccess, onSwitchMode
           method: 'POST',
           body: JSON.stringify({ email, password }),
         })
-        onSuccess({ id: data.user.id, email: data.user.email, token: data.token })
+        onSuccess({ id: data.user.id, email: data.user.email, role: data.user.role, storeName: data.user.storeName, token: data.token })
         setEmail('')
         setPassword('')
       }

@@ -36,11 +36,18 @@ app.get("/metrics", async (_, res) => {
   res.send(await registry.metrics());
 });
 
+// ── Register ──
 app.post("/register", async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, role, storeName, storeDescription } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: "email and password are required" });
   }
+  const userRole = role === "seller" ? "seller" : "buyer";
+
+  if (userRole === "seller" && !storeName) {
+    return res.status(400).json({ error: "storeName is required for seller registration" });
+  }
+
   if (useDb && db) {
     try {
       const existing = await db.query("SELECT id FROM users WHERE email = $1", [email]);
@@ -49,17 +56,19 @@ app.post("/register", async (req, res) => {
       }
       const hash = hashPassword(password);
       const r = await db.query(
-        "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id",
-        [email, hash]
+        "INSERT INTO users (email, password_hash, role, store_name, store_description) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [email, hash, userRole, storeName || null, storeDescription || null]
       );
       const id = `u${r.rows[0].id}`;
-      return res.status(201).json({ id, email });
+      return res.status(201).json({ id, email, role: userRole, storeName: storeName || null });
     } catch (err) {
       console.error("register db error:", err);
       const msg = process.env.NODE_ENV === "production" ? "registration failed" : err.message;
       return res.status(500).json({ error: msg });
     }
   }
+
+  // In-memory fallback
   if (users.find((u) => u.email === email)) {
     return res.status(409).json({ error: "user already exists" });
   }
@@ -67,40 +76,79 @@ app.post("/register", async (req, res) => {
     id: `u${users.length + 1}`,
     email,
     passwordHash: hashPassword(password),
+    role: userRole,
+    storeName: storeName || null,
+    storeDescription: storeDescription || null,
   };
   users.push(user);
-  return res.status(201).json({ id: user.id, email: user.email });
+  return res.status(201).json({ id: user.id, email: user.email, role: user.role, storeName: user.storeName });
 });
 
+// ── Login ──
 app.post("/login", async (req, res) => {
   const { email, password } = req.body || {};
   if (useDb && db) {
     try {
-      const r = await db.query("SELECT id, email, password_hash FROM users WHERE email = $1", [
-        email,
-      ]);
+      const r = await db.query(
+        "SELECT id, email, password_hash, role, store_name FROM users WHERE email = $1",
+        [email]
+      );
       const row = r.rows[0];
       if (!row || row.password_hash !== hashPassword(password || "")) {
         return res.status(401).json({ error: "invalid credentials" });
       }
-      const token = jwt.sign({ sub: `u${row.id}`, email: row.email }, jwtSecret, {
-        expiresIn: "1h",
+      const token = jwt.sign(
+        { sub: `u${row.id}`, email: row.email, role: row.role || "buyer" },
+        jwtSecret,
+        { expiresIn: "1h" }
+      );
+      return res.json({
+        token,
+        user: {
+          id: `u${row.id}`,
+          email: row.email,
+          role: row.role || "buyer",
+          storeName: row.store_name || null,
+        },
       });
-      return res.json({ token, user: { id: `u${row.id}`, email: row.email } });
     } catch (err) {
       console.error("login db error:", err);
       const msg = process.env.NODE_ENV === "production" ? "login failed" : err.message;
       return res.status(500).json({ error: msg });
     }
   }
+
+  // In-memory fallback
   const user = users.find((u) => u.email === email);
   if (!user || user.passwordHash !== hashPassword(password || "")) {
     return res.status(401).json({ error: "invalid credentials" });
   }
-  const token = jwt.sign({ sub: user.id, email: user.email }, jwtSecret, {
-    expiresIn: "1h",
+  const token = jwt.sign(
+    { sub: user.id, email: user.email, role: user.role || "buyer" },
+    jwtSecret,
+    { expiresIn: "1h" }
+  );
+  return res.json({
+    token,
+    user: { id: user.id, email: user.email, role: user.role || "buyer", storeName: user.storeName || null },
   });
-  return res.json({ token, user: { id: user.id, email: user.email } });
+});
+
+// ── Get current user profile ──
+app.get("/me", (req, res) => {
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "unauthorized" });
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    return res.json({
+      id: decoded.sub,
+      email: decoded.email,
+      role: decoded.role || "buyer",
+    });
+  } catch {
+    return res.status(401).json({ error: "invalid or expired token" });
+  }
 });
 
 if (require.main === module) {

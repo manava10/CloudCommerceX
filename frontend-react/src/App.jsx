@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { api } from './lib/api'
 import { ToastProvider, useToast } from './context/ToastContext'
 import Header from './components/Header'
@@ -7,9 +7,26 @@ import HomePage from './pages/HomePage'
 import OrdersPage from './pages/OrdersPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
+import SellerRegisterPage from './pages/SellerRegisterPage'
+import SellerDashboardPage from './pages/SellerDashboardPage'
+import SellerProductsPage from './pages/SellerProductsPage'
+import SellerAddProductPage from './pages/SellerAddProductPage'
+import SellerOrdersPage from './pages/SellerOrdersPage'
+import SellerSidebar from './components/SellerSidebar'
 import AuthModal from './components/AuthModal'
 import CartDrawer from './components/CartDrawer'
 import ProtectedRoute from './components/ProtectedRoute'
+
+function SellerLayout({ user, children }) {
+  return (
+    <div className="flex min-h-screen bg-stone-50">
+      <SellerSidebar user={user} />
+      <main className="flex-1 ml-[260px] p-8">
+        {children}
+      </main>
+    </div>
+  )
+}
 
 function AppContent() {
   const toast = useToast()
@@ -100,7 +117,42 @@ function AppContent() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-stone-50">
+      <RoutesWrapper
+        user={user}
+        products={products}
+        productsLoading={productsLoading}
+        cart={cart}
+        cartLoading={cartLoading}
+        showAuth={showAuth}
+        setShowAuth={setShowAuth}
+        showCart={showCart}
+        setShowCart={setShowCart}
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        onAuthSuccess={onAuthSuccess}
+        setUser={setUser}
+        addToCart={addToCart}
+        removeFromCart={removeFromCart}
+        refreshCart={refreshCart}
+      />
+    </BrowserRouter>
+  )
+}
+
+function RoutesWrapper({
+  user, products, productsLoading, cart, cartLoading,
+  showAuth, setShowAuth, showCart, setShowCart, authMode, setAuthMode,
+  onAuthSuccess, setUser, addToCart, removeFromCart, refreshCart
+}) {
+  const location = useLocation()
+  const isSellerDashboard = location.pathname.startsWith('/seller') && location.pathname !== '/seller/register'
+
+  // Show header on all pages EXCEPT the seller dashboard (which has its own sidebar)
+  const showHeader = !isSellerDashboard
+
+  return (
+    <div className="min-h-screen bg-stone-50">
+      {showHeader && (
         <Header
           user={user}
           cartCount={cart.reduce((s, i) => s + (i.qty || 1), 0)}
@@ -109,31 +161,67 @@ function AppContent() {
           onLogout={() => setUser(null)}
           onCartClick={() => setShowCart(true)}
         />
-        <Routes>
-          <Route path="/" element={<HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
-          <Route path="/orders" element={<ProtectedRoute user={user}><OrdersPage user={user} products={products} /></ProtectedRoute>} />
-          <Route path="/checkout" element={<ProtectedRoute user={user}><CheckoutPage user={user} cart={cart} products={products} onCartCleared={refreshCart} /></ProtectedRoute>} />
-          <Route path="/order-confirmation/:orderId" element={<ProtectedRoute user={user}><OrderConfirmationPage user={user} products={products} /></ProtectedRoute>} />
-        </Routes>
-        <AuthModal
-          open={showAuth}
-          mode={authMode}
-          onClose={() => setShowAuth(false)}
-          onSuccess={onAuthSuccess}
-          onSwitchMode={() => setAuthMode((m) => (m === 'login' ? 'signup' : 'login'))}
-        />
-        <CartDrawer
-          open={showCart}
-          onClose={() => setShowCart(false)}
-          cart={cart}
-          cartLoading={cartLoading}
-          products={products}
-          user={user}
-          onRemove={removeFromCart}
-          onLogin={() => { setAuthMode('login'); setShowAuth(true); setShowCart(false) }}
-        />
-      </div>
-    </BrowserRouter>
+      )}
+
+      <Routes>
+        {/* ── Buyer routes ── */}
+        <Route path="/" element={<HomePage products={products} productsLoading={productsLoading} onAddToCart={addToCart} />} />
+        <Route path="/orders" element={<ProtectedRoute user={user}><OrdersPage user={user} products={products} /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute user={user}><CheckoutPage user={user} cart={cart} products={products} onCartCleared={refreshCart} /></ProtectedRoute>} />
+        <Route path="/order-confirmation/:orderId" element={<ProtectedRoute user={user}><OrderConfirmationPage user={user} products={products} /></ProtectedRoute>} />
+
+        {/* ── Seller registration (shows header, same as homepage) ── */}
+        <Route path="/seller/register" element={<SellerRegisterPage onSuccess={onAuthSuccess} />} />
+
+        {/* ── Seller dashboard routes ── */}
+        <Route path="/seller" element={
+          <ProtectedRoute user={user}>
+            <SellerLayout user={user}>
+              <SellerDashboardPage user={user} />
+            </SellerLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/seller/products" element={
+          <ProtectedRoute user={user}>
+            <SellerLayout user={user}>
+              <SellerProductsPage user={user} />
+            </SellerLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/seller/add-product" element={
+          <ProtectedRoute user={user}>
+            <SellerLayout user={user}>
+              <SellerAddProductPage user={user} />
+            </SellerLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/seller/orders" element={
+          <ProtectedRoute user={user}>
+            <SellerLayout user={user}>
+              <SellerOrdersPage user={user} />
+            </SellerLayout>
+          </ProtectedRoute>
+        } />
+      </Routes>
+
+      <AuthModal
+        open={showAuth}
+        mode={authMode}
+        onClose={() => setShowAuth(false)}
+        onSuccess={onAuthSuccess}
+        onSwitchMode={() => setAuthMode((m) => (m === 'login' ? 'signup' : 'login'))}
+      />
+      <CartDrawer
+        open={showCart}
+        onClose={() => setShowCart(false)}
+        cart={cart}
+        cartLoading={cartLoading}
+        products={products}
+        user={user}
+        onRemove={removeFromCart}
+        onLogin={() => { setAuthMode('login'); setShowAuth(true); setShowCart(false) }}
+      />
+    </div>
   )
 }
 

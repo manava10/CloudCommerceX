@@ -1,5 +1,7 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../../../.env") });
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const client = require("prom-client");
 
 const app = express();
@@ -9,48 +11,306 @@ const registry = new client.Registry();
 client.collectDefaultMetrics({ register: registry });
 
 const port = process.env.PORT || 4002;
+const jwtSecret = process.env.JWT_SECRET || "dev-secret";
+const useDb = !!process.env.DATABASE_URL;
 
-const products = [
-  { id: "p1", name: "Keychron K2 Mechanical Keyboard", price: 6999, stock: 30, image: "https://images.unsplash.com/photo-1595225476474-87563907a212?w=600&h=400&fit=crop" },
-  { id: "p2", name: "Logitech MX Master 3S", price: 8999, stock: 50, image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=600&h=400&fit=crop" },
-  { id: "p3", name: "Anker USB-C Thunderbolt Hub", price: 4499, stock: 20, image: "https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=600&h=400&fit=crop" },
-  { id: "p4", name: "Ergonomic Monitor Desk Stand", price: 2999, stock: 25, image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=600&h=400&fit=crop" },
-  { id: "p5", name: "Sony INZONE H9 Headset", price: 22990, stock: 15, image: "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=600&h=400&fit=crop" },
-  { id: "p6", name: "Minimalist LED Desk Lamp", price: 1999, stock: 40, image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&h=400&fit=crop" },
-  { id: "p7", name: "Apple iPad Pro 12.9", price: 99900, stock: 10, image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&h=400&fit=crop" },
-  { id: "p8", name: "Noise Cancelling Earbuds", price: 14999, stock: 65, image: "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=600&h=400&fit=crop" },
-  { id: "p9", name: "Ultra-Wide Curve Monitor", price: 45000, stock: 12, image: "https://images.unsplash.com/photo-1542393545-10f5cde2c810?w=600&h=400&fit=crop" },
-  { id: "p10", name: "Smart RGB Hexagon Panels", price: 8599, stock: 80, image: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=600&h=400&fit=crop" },
-  { id: "p11", name: "Standing Desk Converter", price: 12500, stock: 22, image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=600&h=400&fit=crop" },
-  { id: "p12", name: "High-Speed SSD 1TB", price: 7999, stock: 100, image: "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=600&h=400&fit=crop" },
-  { id: "p13", name: "Stream Deck MK.2", price: 14999, stock: 45, image: "https://images.unsplash.com/photo-1626218174358-7769486c4b79?w=600&h=400&fit=crop" },
-  { id: "p14", name: "HD Desktop Microphone", price: 9500, stock: 35, image: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&h=400&fit=crop" },
-  { id: "p15", name: "Acoustic Wall Panels (Pack of 12)", price: 3500, stock: 120, image: "https://images.unsplash.com/photo-1582806202450-482d8c39acfd?w=600&h=400&fit=crop" },
-  { id: "p16", name: "Wireless Charging Mouse Pad", price: 4999, stock: 60, image: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=600&h=400&fit=crop" },
-  { id: "p17", name: "Pro Web Camera 4K", price: 18999, stock: 18, image: "https://images.unsplash.com/photo-1587826080692-f439cd0b70da?w=600&h=400&fit=crop" },
-  { id: "p18", name: "Dual Monitor Arm", price: 6500, stock: 55, image: "https://images.unsplash.com/photo-1593640495253-23196b27a87f?w=600&h=400&fit=crop" },
-  { id: "p19", name: "Mechanical Numpad", price: 3499, stock: 40, image: "https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?w=600&h=400&fit=crop" },
-  { id: "p20", name: "Cable Management Kit", price: 1200, stock: 200, image: "https://images.unsplash.com/photo-1600320668875-c990def280ed?w=600&h=400&fit=crop" }
-];
+let db;
+if (useDb) {
+  try {
+    db = require("../../common/db");
+  } catch (e) {
+    console.warn("DB module load failed, using in-memory:", e.message);
+  }
+}
 
+// ── In-memory fallback (empty — all products must belong to a seller) ──
+const fallbackProducts = [];
+
+// ── Auth middleware for seller endpoints ──
+function extractUser(req) {
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, jwtSecret);
+  } catch {
+    return null;
+  }
+}
+
+function requireSeller(req, res, next) {
+  const user = extractUser(req);
+  if (!user) return res.status(401).json({ error: "unauthorized" });
+  if (user.role !== "seller") return res.status(403).json({ error: "seller access required" });
+  req.user = user;
+  next();
+}
+
+// ── Health / Metrics ──
 app.get("/health", (_, res) => res.json({ ok: true, service: "catalog" }));
 app.get("/metrics", async (_, res) => {
   res.set("Content-Type", registry.contentType);
   res.send(await registry.metrics());
 });
-app.get("/products", (_, res) => res.json(products));
-app.get("/products/:id", (req, res) => {
-  const product = products.find((p) => p.id === req.params.id);
-  if (!product) {
-    return res.status(404).json({ error: "product not found" });
+
+// ── Public: list all active products ──
+app.get("/products", async (req, res) => {
+  if (useDb && db) {
+    try {
+      const sellerId = req.query.sellerId;
+      let r;
+      if (sellerId) {
+        const numericId = String(sellerId).replace(/^u/, "");
+        r = await db.query(
+          `SELECT id, seller_id as "sellerId", name, description, price, stock, image, category, status, created_at as "createdAt"
+           FROM products WHERE seller_id = $1 ORDER BY created_at DESC`,
+          [numericId]
+        );
+      } else {
+        r = await db.query(
+          `SELECT id, seller_id as "sellerId", name, description, price, stock, image, category, status, created_at as "createdAt"
+           FROM products WHERE status = 'active' ORDER BY created_at DESC`
+        );
+      }
+      const list = r.rows.map((row) => ({
+        id: `p${row.id}`,
+        sellerId: row.sellerId ? `u${row.sellerId}` : null,
+        name: row.name,
+        description: row.description,
+        price: row.price,
+        stock: row.stock,
+        image: row.image,
+        category: row.category,
+        status: row.status,
+        createdAt: row.createdAt,
+      }));
+      return res.json(list);
+    } catch (err) {
+      console.error("products list error:", err);
+      return res.status(500).json({ error: err.message });
+    }
   }
+  return res.json(fallbackProducts);
+});
+
+// ── Public: get single product ──
+app.get("/products/:id", async (req, res) => {
+  if (useDb && db) {
+    try {
+      const numericId = String(req.params.id).replace(/^p/, "");
+      const r = await db.query(
+        `SELECT id, seller_id as "sellerId", name, description, price, stock, image, category, status
+         FROM products WHERE id = $1`,
+        [numericId]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ error: "product not found" });
+      const row = r.rows[0];
+      return res.json({
+        id: `p${row.id}`,
+        sellerId: row.sellerId ? `u${row.sellerId}` : null,
+        name: row.name,
+        description: row.description,
+        price: row.price,
+        stock: row.stock,
+        image: row.image,
+        category: row.category,
+        status: row.status,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  const product = fallbackProducts.find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: "product not found" });
   return res.json(product);
+});
+
+// ── Seller: create product ──
+app.post("/products", requireSeller, async (req, res) => {
+  const { name, description, price, stock, image, category } = req.body || {};
+  if (!name || !price) {
+    return res.status(400).json({ error: "name and price are required" });
+  }
+  const sellerId = String(req.user.sub).replace(/^u/, "");
+
+  if (useDb && db) {
+    try {
+      const r = await db.query(
+        `INSERT INTO products (seller_id, name, description, price, stock, image, category, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active') RETURNING id, created_at as "createdAt"`,
+        [sellerId, name, description || null, Number(price), Number(stock) || 0, image || null, category || null]
+      );
+      const row = r.rows[0];
+      return res.status(201).json({
+        id: `p${row.id}`,
+        sellerId: `u${sellerId}`,
+        name,
+        description: description || null,
+        price: Number(price),
+        stock: Number(stock) || 0,
+        image: image || null,
+        category: category || null,
+        status: "active",
+        createdAt: row.createdAt,
+      });
+    } catch (err) {
+      console.error("product create error:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // In-memory fallback
+  const product = {
+    id: `p${fallbackProducts.length + 1}`,
+    sellerId: req.user.sub,
+    name,
+    description: description || null,
+    price: Number(price),
+    stock: Number(stock) || 0,
+    image: image || null,
+    category: category || null,
+    status: "active",
+  };
+  fallbackProducts.push(product);
+  return res.status(201).json(product);
+});
+
+// ── Seller: update product ──
+app.put("/products/:id", requireSeller, async (req, res) => {
+  const numericId = String(req.params.id).replace(/^p/, "");
+  const sellerId = String(req.user.sub).replace(/^u/, "");
+  const { name, description, price, stock, image, category, status } = req.body || {};
+
+  if (useDb && db) {
+    try {
+      // Verify ownership
+      const check = await db.query("SELECT seller_id FROM products WHERE id = $1", [numericId]);
+      if (check.rows.length === 0) return res.status(404).json({ error: "product not found" });
+      if (String(check.rows[0].seller_id) !== sellerId) {
+        return res.status(403).json({ error: "you do not own this product" });
+      }
+
+      const r = await db.query(
+        `UPDATE products SET
+           name = COALESCE($1, name),
+           description = COALESCE($2, description),
+           price = COALESCE($3, price),
+           stock = COALESCE($4, stock),
+           image = COALESCE($5, image),
+           category = COALESCE($6, category),
+           status = COALESCE($7, status),
+           updated_at = NOW()
+         WHERE id = $8
+         RETURNING id, seller_id as "sellerId", name, description, price, stock, image, category, status, updated_at as "updatedAt"`,
+        [name || null, description, price ? Number(price) : null, stock != null ? Number(stock) : null, image, category, status, numericId]
+      );
+      const row = r.rows[0];
+      return res.json({
+        id: `p${row.id}`,
+        sellerId: `u${row.sellerId}`,
+        name: row.name,
+        description: row.description,
+        price: row.price,
+        stock: row.stock,
+        image: row.image,
+        category: row.category,
+        status: row.status,
+        updatedAt: row.updatedAt,
+      });
+    } catch (err) {
+      console.error("product update error:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  return res.status(501).json({ error: "not implemented without database" });
+});
+
+// ── Seller: delete (archive) product ──
+app.delete("/products/:id", requireSeller, async (req, res) => {
+  const numericId = String(req.params.id).replace(/^p/, "");
+  const sellerId = String(req.user.sub).replace(/^u/, "");
+
+  if (useDb && db) {
+    try {
+      const check = await db.query("SELECT seller_id FROM products WHERE id = $1", [numericId]);
+      if (check.rows.length === 0) return res.status(404).json({ error: "product not found" });
+      if (String(check.rows[0].seller_id) !== sellerId) {
+        return res.status(403).json({ error: "you do not own this product" });
+      }
+      await db.query("UPDATE products SET status = 'archived', updated_at = NOW() WHERE id = $1", [numericId]);
+      return res.json({ ok: true, message: "product archived" });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  return res.status(501).json({ error: "not implemented without database" });
+});
+
+// ── Seller: get own products ──
+app.get("/seller/:sellerId/products", async (req, res) => {
+  const numericId = String(req.params.sellerId).replace(/^u/, "");
+  if (useDb && db) {
+    try {
+      const r = await db.query(
+        `SELECT id, seller_id as "sellerId", name, description, price, stock, image, category, status, created_at as "createdAt"
+         FROM products WHERE seller_id = $1 ORDER BY created_at DESC`,
+        [numericId]
+      );
+      const list = r.rows.map((row) => ({
+        id: `p${row.id}`,
+        sellerId: `u${row.sellerId}`,
+        name: row.name,
+        description: row.description,
+        price: row.price,
+        stock: row.stock,
+        image: row.image,
+        category: row.category,
+        status: row.status,
+        createdAt: row.createdAt,
+      }));
+      return res.json(list);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  return res.json(fallbackProducts.filter((p) => p.sellerId === req.params.sellerId));
+});
+
+// ── Seller: stats ──
+app.get("/seller/:sellerId/stats", async (req, res) => {
+  const numericId = String(req.params.sellerId).replace(/^u/, "");
+  if (useDb && db) {
+    try {
+      const productCount = await db.query(
+        "SELECT COUNT(*) as count FROM products WHERE seller_id = $1 AND status != 'archived'",
+        [numericId]
+      );
+      const totalStock = await db.query(
+        "SELECT COALESCE(SUM(stock), 0) as total FROM products WHERE seller_id = $1 AND status = 'active'",
+        [numericId]
+      );
+      const orderStats = await db.query(
+        `SELECT COUNT(DISTINCT oi.order_id) as order_count, COALESCE(SUM(oi.price * oi.qty), 0) as revenue
+         FROM order_items oi WHERE oi.seller_id = $1`,
+        [numericId]
+      );
+      return res.json({
+        productCount: parseInt(productCount.rows[0].count, 10),
+        totalStock: parseInt(totalStock.rows[0].total, 10),
+        orderCount: parseInt(orderStats.rows[0].order_count, 10),
+        revenue: parseInt(orderStats.rows[0].revenue, 10),
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  return res.json({ productCount: 0, totalStock: 0, orderCount: 0, revenue: 0 });
 });
 
 if (require.main === module) {
   app.listen(port, () => {
-    console.log(`catalog service listening on ${port}`);
+    console.log(`catalog service listening on ${port} (db: ${useDb && db ? "yes" : "no"})`);
   });
 }
 
-module.exports = { app, products };
+module.exports = { app, products: fallbackProducts };

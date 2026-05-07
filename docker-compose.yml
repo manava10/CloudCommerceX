@@ -41,6 +41,8 @@ services:
         SERVICE_NAME: catalog
     environment:
       - PORT=4002
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=super-secret
     ports:
       - "4002:4002"
 

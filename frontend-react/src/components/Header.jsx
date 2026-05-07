@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import NotificationsDropdown from './NotificationsDropdown'
 
 export default function Header({ user, cartCount, onLogin, onSignup, onLogout, onCartClick }) {
+  const isSeller = user?.role === 'seller'
+
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-stone-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
@@ -14,12 +16,23 @@ export default function Header({ user, cartCount, onLogin, onSignup, onLogout, o
             <>
               <span className="text-sm text-stone-600">{user.email}</span>
               <NotificationsDropdown user={user} />
-              <Link
-                to="/orders"
-                className="text-sm text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100"
-              >
-                My Orders
-              </Link>
+
+              {isSeller ? (
+                <Link
+                  to="/seller"
+                  className="text-sm text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 px-4 py-1.5 rounded-lg transition-all font-medium"
+                >
+                  🏪 Seller Dashboard
+                </Link>
+              ) : (
+                <Link
+                  to="/orders"
+                  className="text-sm text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100"
+                >
+                  My Orders
+                </Link>
+              )}
+
               <button
                 onClick={onCartClick}
                 className="relative p-2 rounded-lg hover:bg-stone-100 transition"
@@ -42,6 +55,12 @@ export default function Header({ user, cartCount, onLogin, onSignup, onLogout, o
             </>
           ) : (
             <>
+              <Link
+                to="/seller/register"
+                className="text-sm text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded-lg hover:bg-indigo-50 font-medium transition"
+              >
+                🏪 Become a Seller
+              </Link>
               <button
                 onClick={onLogin}
                 className="text-sm text-stone-600 hover:text-stone-900 px-3 py-1.5 rounded-lg hover:bg-stone-100"

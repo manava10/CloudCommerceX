@@ -22,6 +22,28 @@ function addNotification(type, payload) {
     userId,
     createdAt: new Date().toISOString(),
   });
+
+  // Also create a notification for each seller involved in the order
+  if (type === "ORDER_CREATED" && payload?.items) {
+    const sellerIds = [...new Set(payload.items.map((i) => i.sellerId).filter(Boolean))];
+    for (const sellerId of sellerIds) {
+      const sellerItems = payload.items.filter((i) => i.sellerId === sellerId);
+      const sellerTotal = sellerItems.reduce((s, i) => s + i.price * i.qty, 0);
+      notifications.push({
+        id: `n${notifications.length + 1}`,
+        type: "SELLER_NEW_ORDER",
+        payload: {
+          orderId: payload.id,
+          buyerId: payload.userId,
+          sellerId,
+          items: sellerItems,
+          total: sellerTotal,
+        },
+        userId: sellerId,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
 }
 
 app.get("/health", (_, res) => res.json({ ok: true, service: "notification" }));
@@ -43,6 +65,9 @@ async function startConsumers() {
   );
   const ok2 = await subscribe("payment.completed", (payload) =>
     addNotification("PAYMENT_COMPLETED", payload)
+  );
+  const ok3 = await subscribe("order.status_updated", (payload) =>
+    addNotification("ORDER_STATUS_UPDATED", payload)
   );
   if (!ok1 || !ok2) {
     throw new Error("RabbitMQ not available (RABBITMQ_URL not set or connection failed)");

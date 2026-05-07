@@ -32,7 +32,7 @@ function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: "unauthorized" });
   try {
     const decoded = jwt.verify(token, jwtSecret);
-    req.user = { id: decoded.sub };
+    req.user = { id: decoded.sub, role: decoded.role || "buyer" };
     next();
   } catch {
     return res.status(401).json({ error: "invalid or expired token" });
@@ -77,11 +77,31 @@ app.get("/metrics", async (_, res) => {
 // Swagger UI Endpoint
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+// ── Auth routes (public) ──
 app.use("/api/auth", (req, res) => forward(req, res, serviceUrls.auth, "/api/auth"));
-app.use("/api/catalog", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+
+// ── Catalog routes ──
+// Public GET routes for browsing products
+app.get("/api/catalog/products", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+app.get("/api/catalog/products/:id", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+// Seller product CRUD (requires auth — catalog service verifies seller role via JWT)
+app.post("/api/catalog/products", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+app.put("/api/catalog/products/:id", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+app.delete("/api/catalog/products/:id", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+// Seller-specific catalog endpoints
+app.get("/api/catalog/seller/:sellerId/products", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+app.get("/api/catalog/seller/:sellerId/stats", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+
+// ── Cart routes (auth required) ──
 app.use("/api/cart", requireAuth, (req, res) => forward(req, res, serviceUrls.cart, "/api/cart"));
+
+// ── Order routes (auth required) ──
 app.use("/api/order", requireAuth, (req, res) => forward(req, res, serviceUrls.order, "/api/order"));
+
+// ── Payment routes (auth required) ──
 app.use("/api/payment", requireAuth, (req, res) => forward(req, res, serviceUrls.payment, "/api/payment"));
+
+// ── Notification routes (auth required) ──
 app.use("/api/notification", requireAuth, (req, res) =>
   forward(req, res, serviceUrls.notification, "/api/notification")
 );

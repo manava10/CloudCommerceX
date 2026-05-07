@@ -80,6 +80,8 @@ export default function NotificationsDropdown({ user }) {
   const getMessage = (n) => {
     if (n.type === 'ORDER_CREATED') return `Order #${n.payload?.id || '?'} placed`
     if (n.type === 'PAYMENT_COMPLETED') return `Payment for order #${n.payload?.orderId || '?'} completed`
+    if (n.type === 'ORDER_STATUS_UPDATED') return `Order #${n.payload?.orderId || '?'} → ${n.payload?.status || '?'}`
+    if (n.type === 'SELLER_NEW_ORDER') return `🏪 New order received! Order #${n.payload?.orderId || '?'}`
     return n.type || 'Notification'
   }
 
