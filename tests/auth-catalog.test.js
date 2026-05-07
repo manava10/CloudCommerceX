@@ -1,6 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+// Force in-memory mode for tests
+// delete process.env.DATABASE_URL;
+
 const { app: authApp, users: memoryUsers } = require("../services/auth/src/index");
 const { app: catalogApp } = require("../services/catalog/src/index");
 
@@ -62,3 +65,4 @@ test("auth register/login and catalog listing works", async () => {
     setTimeout(() => process.exit(0), 50); // Force exit hanging AMQP connections
   }
 });
+
