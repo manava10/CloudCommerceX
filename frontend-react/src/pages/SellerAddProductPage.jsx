@@ -126,14 +126,33 @@ export default function SellerAddProductPage({ user, onProductAdded }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Image URL</label>
+              <label className="block text-sm font-medium text-stone-700 mb-1">Product Image</label>
               <input
-                name="image"
-                value={form.image}
-                onChange={handleChange}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none"
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  setSaving(true)
+                  try {
+                    const formData = new FormData()
+                    formData.append('image', file)
+                    const data = await api('/catalog/upload', {
+                      method: 'POST',
+                      body: formData,
+                    })
+                    setForm(f => ({ ...f, image: data.url }))
+                    toast('Image uploaded!', 'success')
+                  } catch (err) {
+                    toast(err.message, 'error')
+                  } finally {
+                    setSaving(false)
+                  }
+                }}
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:ring-2 focus:ring-stone-400 focus:border-stone-400 outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-stone-50 file:text-stone-700 hover:file:bg-stone-100"
               />
+              {form.image && <p className="text-sm text-green-600 mt-2">Image uploaded successfully!</p>}
             </div>
           </div>
 

@@ -2,5 +2,9 @@
   "name": "@cloudcommercx/catalog",
   "version": "1.0.0",
   "main": "src/index.js",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
+    "multer": "^2.1.1"
+  }
 }

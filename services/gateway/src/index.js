@@ -88,6 +88,28 @@ app.get("/api/catalog/products/:id", (req, res) => forward(req, res, serviceUrls
 app.post("/api/catalog/products", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
 app.put("/api/catalog/products/:id", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
 app.delete("/api/catalog/products/:id", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
+
+// Proxy for image upload (streams multipart/form-data directly to avoid JSON serialization)
+const http = require("http");
+app.post("/api/catalog/upload", requireAuth, (req, res) => {
+  const targetUrl = new URL(`${serviceUrls.catalog}/upload`);
+  const options = {
+    hostname: targetUrl.hostname,
+    port: targetUrl.port,
+    path: targetUrl.pathname,
+    method: "POST",
+    headers: {
+      ...req.headers,
+      "host": targetUrl.host
+    }
+  };
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+  proxyReq.on("error", (e) => res.status(502).json({ error: "upload service unavailable" }));
+  req.pipe(proxyReq);
+});
 // Seller-specific catalog endpoints
 app.get("/api/catalog/seller/:sellerId/products", (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));
 app.get("/api/catalog/seller/:sellerId/stats", requireAuth, (req, res) => forward(req, res, serviceUrls.catalog, "/api/catalog"));

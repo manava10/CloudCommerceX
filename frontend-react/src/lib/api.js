@@ -10,10 +10,14 @@ function getAuthHeader() {
 
 export async function api(path, options = {}) {
   const { skipLogoutOn401, ...fetchOptions } = options
-  const headers = { 'Content-Type': 'application/json', ...getAuthHeader(), ...fetchOptions.headers }
+  const isFormData = fetchOptions.body instanceof FormData
+  const headers = { ...getAuthHeader(), ...fetchOptions.headers }
+  if (!isFormData && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
+  }
   const res = await fetch(path.startsWith('http') ? path : `${API}${path}`, {
-    headers,
     ...fetchOptions,
+    headers,
   })
   const text = await res.text()
   let data

@@ -30,6 +30,7 @@ export default function SellerProductsPage({ user }) {
       price: product.price / 100,
       stock: product.stock,
       status: product.status,
+      image: product.image,
     })
   }
 
@@ -42,6 +43,7 @@ export default function SellerProductsPage({ user }) {
           price: Math.round(Number(editForm.price) * 100),
           stock: Number(editForm.stock),
           status: editForm.status,
+          image: editForm.image,
         }),
       })
       toast('Product updated!', 'success')
@@ -110,8 +112,30 @@ export default function SellerProductsPage({ user }) {
               {products.map((p) => (
                 <tr key={p.id} className={`border-b border-stone-100 last:border-b-0 hover:bg-stone-50/50 transition ${editingId === p.id ? 'bg-amber-50/40' : ''}`}>
                   <td className="px-5 py-3">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
-                      {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <span className="text-lg">📦</span>}
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center relative group">
+                      {(editingId === p.id ? editForm.image : p.image) ? (
+                        <img src={editingId === p.id ? editForm.image : p.image} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">📦</span>
+                      )}
+                      {editingId === p.id && (
+                        <label className="absolute inset-0 bg-black/50 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[10px] text-white font-medium">Upload</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                            const file = e.target.files[0]
+                            if (!file) return
+                            try {
+                              const formData = new FormData()
+                              formData.append('image', file)
+                              const data = await api('/catalog/upload', { method: 'POST', body: formData })
+                              setEditForm(f => ({ ...f, image: data.url }))
+                              toast('Image uploaded!', 'success')
+                            } catch (err) {
+                              toast(err.message, 'error')
+                            }
+                          }} />
+                        </label>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-3">

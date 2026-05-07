@@ -175,6 +175,22 @@ app.post("/products", requireSeller, async (req, res) => {
   return res.status(201).json(product);
 });
 
+// ── Seller: upload product image ──
+const { uploadMiddleware, uploadToS3 } = require("./upload");
+
+app.post("/upload", requireSeller, uploadMiddleware.single("image"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "no image file provided" });
+  }
+  try {
+    const imageUrl = await uploadToS3(req.file);
+    return res.json({ url: imageUrl });
+  } catch (err) {
+    console.error("image upload error:", err);
+    return res.status(500).json({ error: "failed to upload image: " + err.message });
+  }
+});
+
 // ── Seller: update product ──
 app.put("/products/:id", requireSeller, async (req, res) => {
   const numericId = String(req.params.id).replace(/^p/, "");
